@@ -1,0 +1,11 @@
+#!/usr/bin/python
+
+rom = bytearray([0xea] * 32768)
+rom[0x7ffb] = 0x4c
+rom[0x7ffc] = 0x00
+rom[0x7ffd] = 0x80
+rom[0x7ffe] = 0x00
+rom[0x7fff] = 0x00
+
+with open("rom.bin", "wb") as f:
+    f.write(rom);

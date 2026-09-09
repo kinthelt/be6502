@@ -1,0 +1,124 @@
+GAL22V10
+816DEC01
+
+PHI2 RWB  A12  A13  A14  A15  A16  A17  A18  A23  NC   GND
+NC   NC   NC   NC   VRAMCE RAMCE ROMCE IOSEL OEGATE WEGATE NC VCC
+
+/ROMCE = /A23 * /A18 * /A17 * /A16 * A15
+
+/RAMCE = /A23 * /A18 * /A17 * /A16 * /A15 * /A14 + /A23 * /A18 * /A17 * /A16 * /A15 * A14 * /A13 + /A23 * A16 + /A23 * A17 + /A23 * A18
+
+/VRAMCE = A23
+
+/IOSEL = /A23 * /A18 * /A17 * /A16 * /A15 * A14 * A13
+
+/OEGATE = PHI2 * RWB
+
+/WEGATE = PHI2 * /RWB
+
+DESCRIPTION
+
+W65C816S address decode. Target: ATF22V10C-7PX.
+
+
+PIN ASSIGNMENT
+
+ 1  PHI2    CPU pin 37, system clock
+ 2  RWB     CPU pin 34
+ 3  A12     CPU pin 22 (declared, not used -- see NOTE 4)
+ 4  A13     CPU pin 23
+ 5  A14     CPU pin 24
+ 6  A15     CPU pin 25
+ 7  A16     74HC573 Q0
+ 8  A17     74HC573 Q1
+ 9  A18     74HC573 Q2
+10  A23     74HC573 Q7
+11  NC
+12  GND
+13  NC
+14  NC      spare macrocell
+15  NC      spare macrocell
+16  NC      spare macrocell
+17  VRAMCE  62256 pin 20  /CE
+18  RAMCE   AS6C4008 pin 22 /CE
+19  ROMCE   AT28C256 pin 20 /CE
+20  IOSEL   74HC138 pin 4  /E1
+21  OEGATE  AS6C4008 /OE, 62256 /OE, AT28C256 /OE
+22  WEGATE  AS6C4008 /WE, 62256 /WE
+23  NC      spare macrocell
+24  VCC
+
+
+MEMORY MAP
+
+$00:0000-$00:5FFF   RAM   AS6C4008
+$00:6000-$00:7FFF   I/O   74HC138, eight 1 KB slots on A10-A12
+$00:8000-$00:FFFF   ROM   AT28C256
+$01:0000-$07:FFFF   RAM   AS6C4008
+$80:0000-$80:7FFF   VRAM  62256
+
+A19-A22 are not decoded. Banks $08-$7F alias banks $00-$07; banks
+$81-$FF alias bank $80. Within bank $80 the 62256 aliases every 32 KB.
+See NOTE 3.
+
+
+NOTE 1 -- SHARED OUTPUT ENABLE AND WRITE ENABLE
+
+OEGATE and WEGATE are common to all three memory devices. This is safe
+because ROMCE, RAMCE and VRAMCE are mutually exclusive, so at most one
+device has its outputs enabled at any time.
+
+OEGATE and WEGATE are also mutually exclusive by construction, since one
+requires RWB high and the other RWB low. The SRAMs never see /OE and /WE
+low simultaneously.
+
+WEGATE includes PHI2 so that no write can occur while PHI2 is low. Raw
+RWB would allow a write during PHI2 low, when D0-D7 still carries the
+bank byte rather than write data.
+
+
+NOTE 2 -- CHIP SELECTS ARE NOT PHI2 GATED
+
+ROMCE, RAMCE, VRAMCE and IOSEL depend on A16-A23, which come from the
+74HC573. That latch is transparent while PHI2 is low, so those inputs are
+briefly unsettled at the start of each PHI2 low period and the selects can
+glitch there.
+
+The glitches are harmless. Writes are blocked because WEGATE requires PHI2
+high. Reads latch nothing -- the CPU samples D0-D7 at the falling edge of
+PHI2, by which point the bank byte has long since settled. The 65C22 and
+65C51 likewise sample CS and RS at the falling edge of PHI2.
+
+Leaving the selects ungated gives ROM and RAM the longest possible access
+window, which matters at higher clock speeds.
+
+If a PHI2 qualifier is wanted later, the 74HC138 has /E2 and E3 free. Tie
+/E2 to /PHI2 -- no reburn required.
+
+
+NOTE 3 -- UNDECODED ADDRESS LINES
+
+A19-A22 are deliberately left out of the array. Nothing is populated above
+bank $07 other than video, so the aliasing costs nothing today.
+
+Tighten this first if a second RAM device or a second video region is ever
+added. Four spare macrocells and four free input pins (11, 13, and two of
+the spares reconfigured as inputs) are available for that.
+
+
+NOTE 4 -- A12
+
+A12 is wired to the GAL but unused. The I/O window is split externally by
+the 74HC138 on A10-A12, so moving the VIA or ACIA between slots is a wire
+change on the decoder rather than a reburn.
+
+A12 is present so that finer I/O decode can be pulled into the GAL later
+without adding a wire. If Galette rejects an unused input pin, change pin 3
+to NC and leave the trace unconnected.
+
+
+NOTE 5 -- ATF22V10C POWER-DOWN
+
+The power-down feature is enabled at the silicon level on this part and is
+not controlled from this file. Disable it at programming time by writing
+row 59, then verify pin 4 behaviour on the bench after the first burn.

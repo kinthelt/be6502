@@ -42,3 +42,71 @@ With the addition of multiple banks, I won't be able to use a single 7400 to dec
 | ACIA   | `/CS1 = NOT(NOT(A15) AND A14 AND NOT(A13) AND A12)`, `CS0 = 1` |
 
 **Quirks:** The 62256 is chip-enabled across `$0000`–`$7FFF`; only `/OE = A14` blocks reads above `$3FFF`. Writes to `$4000`–`$7FFF` still land in the RAM chip and cannot be read back, and writes in `$5000`–`$7FFF` hit RAM and the I/O device simultaneously.
+
+## My Address Space
+
+24-bit address space, notated `bank:offset`.
+
+### Top level
+
+| Range                 | Size   | Contents                                  |
+|-----------------------|--------|-------------------------------------------|
+| `$00:0000`–`$00:FFFF` | 64 KB  | Bank 0 — RAM, I/O, ROM (see below)        |
+| `$01:0000`–`$07:FFFF` | 448 KB | RAM, full banks                           |
+| `$08:0000`–`$7F:FFFF` | —      | Aliases of banks `$00`–`$07`              |
+| `$80:0000`–`$80:7FFF` | 32 KB  | Video RAM (62256)                         |
+| `$80:8000`–`$FF:FFFF` | —      | Aliases of `$80:0000`–`$80:7FFF`          |
+
+RAM total: 472 KB reachable of 512 KB installed (AS6C4008). The 40 KB shortfall is
+bank 0's I/O window and ROM window shadowing the SRAM.
+
+### Bank 0
+
+| Range                 | Size    | Contents                                 |
+|-----------------------|---------|------------------------------------------|
+| `$00:0000`–`$00:00FF` | 256 B   | RAM — direct page (reset default)        |
+| `$00:0100`–`$00:01FF` | 256 B   | RAM — stack (reset default)              |
+| `$00:0200`–`$00:5FFF` | 23.5 KB | RAM — general                            |
+| `$00:6000`–`$00:7FFF` | 8 KB    | I/O window — 74HC138, 8 × 1 KB slots     |
+| `$00:8000`–`$00:FFFF` | 32 KB   | ROM (AT28C256)                           |
+
+Direct page and stack are shown at their reset defaults. In native mode both are
+relocatable anywhere within bank 0.
+
+### I/O window
+
+74HC138 enabled by `/IO_SELECT` from the GAL, selects driven by A10–A12.
+
+| Output | Range                 | Device       | Registers                          |
+|--------|-----------------------|--------------|------------------------------------|
+| Y0     | `$00:6000`–`$00:63FF` | W65C22 VIA   | `$6000`–`$600F`, mirrored (A0–A3)  |
+| Y1     | `$00:6400`–`$00:67FF` | unallocated  |                                    |
+| Y2     | `$00:6800`–`$00:6BFF` | unallocated  |                                    |
+| Y3     | `$00:6C00`–`$00:6FFF` | unallocated  |                                    |
+| Y4     | `$00:7000`–`$00:73FF` | W65C51N ACIA | `$7000`–`$7003`, mirrored (A0–A1)  |
+| Y5     | `$00:7400`–`$00:77FF` | unallocated  |                                    |
+| Y6     | `$00:7800`–`$00:7BFF` | unallocated  |                                    |
+| Y7     | `$00:7C00`–`$00:7FFF` | unallocated  |                                    |
+
+### Vectors
+
+| Range                 | Mode      |
+|-----------------------|-----------|
+| `$00:FFE4`–`$00:FFEF` | Native    |
+| `$00:FFF8`–`$00:FFFF` | Emulation |
+
+Both sets are in ROM. ROM is fixed at `$00:8000` — no vector remap or bank switching.
+
+### Decode
+
+Bank byte A16–A23 is captured from D0–D7 by a 74HC573, LE driven by `/PHI2`.
+
+GAL (ATF22V10C) inputs: A12–A15, A16–A18, A23, PHI2, RWB.
+A19–A22 are deliberately left as don't-cares — hence the aliasing above. Tighten
+this first if a second RAM or VRAM device is ever added.
+
+A16–A18 feed the SRAM address pins directly; the GAL uses them only to identify
+bank 0. A23 alone separates the RAM banks from the video bank.
+
+`/WE_RAM` is gated `PHI2 AND /RWB`. Raw RWB would write during PHI2 low, when the
+data bus still carries the bank byte.

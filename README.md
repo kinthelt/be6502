@@ -110,3 +110,178 @@ bank 0. A23 alone separates the RAM banks from the video bank.
 
 `/WE_RAM` is gated `PHI2 AND /RWB`. Raw RWB would write during PHI2 low, when the
 data bus still carries the bank byte.
+
+# Pinout Reference — 75HC138 and W65C22
+
+For the 65C816 breadboard build. I/O window `$00:6000–$00:7FFF`,
+enabled by IOSEL from the ATF22V10C (816DEC01).
+
+---
+
+## 74HC138 — 3-to-8 Line Decoder, DIP-16
+
+| Pin | Name | Connect to |
+|----:|------|------------|
+| 1 | A | A10 |
+| 2 | B | A11 |
+| 3 | C | A12 |
+| 4 | /E1 (/G2A) | IOSEL, GAL pin 20 |
+| 5 | /E2 (/G2B) | GND — reserved PHI2 hook |
+| 6 | E3 (G1) | VCC |
+| 7 | Y7 | $7C00 slot |
+| 8 | GND | GND |
+| 9 | Y6 | $7800 slot |
+| 10 | Y5 | $7400 slot |
+| 11 | Y4 | $7000 — ACIA |
+| 12 | Y3 | $6C00 slot |
+| 13 | Y2 | $6800 slot |
+| 14 | Y1 | $6400 slot |
+| 15 | Y0 | $6000 — VIA CS2B |
+| 16 | VCC | +5V |
+
+100 nF from pin 16 to pin 8, close to the package.
+
+### Output behaviour
+
+All eight outputs idle **high**. Exactly one goes low at a time, and
+only when every enable is satisfied. Nothing is selected at rest.
+
+| Condition | Outputs |
+|-----------|---------|
+| Any enable unsatisfied | all eight high |
+| Enabled, CBA = 000 | Y0 low, rest high |
+| Enabled, CBA = 100 | Y4 low, rest high |
+
+### Enables
+
+Mixed polarity. All three must be true at once:
+
+- pin 4 — LOW
+- pin 5 — LOW
+- pin 6 — HIGH
+
+Naming varies by manufacturer. TI uses /G2A, /G2B, G1; others use
+/E1, /E2, E3. Same pins, same behaviour, different letters. A
+schematic found online may not match the datasheet in hand.
+
+Pin 6 is the trap — the only active-high enable, sitting next to the
+two active-low ones. Tied low, the part has no outputs at all and no
+obvious reason why.
+
+### Slot mapping
+
+C:B:A = A12:A11:A10, straight through.
+
+| Output | Address range | Device |
+|--------|---------------|--------|
+| Y0 | $00:6000–$00:63FF | W65C22 VIA |
+| Y1 | $00:6400–$00:67FF | unallocated |
+| Y2 | $00:6800–$00:6BFF | unallocated |
+| Y3 | $00:6C00–$00:6FFF | unallocated |
+| Y4 | $00:7000–$00:73FF | W65C51N ACIA |
+| Y5 | $00:7400–$00:77FF | unallocated |
+| Y6 | $00:7800–$00:7BFF | unallocated |
+| Y7 | $00:7C00–$00:7FFF | unallocated |
+
+Unused outputs are totem-pole, not open-drain — nothing to pull.
+Leave open, or run to a header row while breadboarding.
+
+---
+
+## W65C22 VIA — DIP-40
+
+| Pin | Signal | Connect to |
+|----:|--------|------------|
+| 1 | VSS | GND |
+| 2–9 | PA0–PA7 | peripheral, ascending |
+| 10–17 | PB0–PB7 | peripheral, ascending |
+| 18 | CB1 | peripheral / shift clock |
+| 19 | CB2 | peripheral / serial data |
+| 20 | VDD | +5V |
+| 21 | IRQB | CPU IRQB — see note |
+| 22 | RWB | CPU RWB |
+| 23 | CS2B | 74HC138 Y0, pin 15 |
+| 24 | CS1 | VCC |
+| 25 | PHI2 | system PHI2 |
+| 26–33 | D7–D0 | data bus, **descending** |
+| 34 | RESB | system reset |
+| 35–38 | RS3–RS0 | A3–A0, **descending** |
+| 39 | CA2 | peripheral |
+| 40 | CA1 | peripheral |
+
+### Chip select
+
+To access a register: CS1 = logic 1 AND CS2B = logic 0.
+
+CS1 is the tie-high enable, not the main select. WDC's default for
+unused pins says the same thing from the other side — hold CS1 high,
+hold CS2B low.
+
+Y0 is active low, so it must land on CS2B. Y0 on CS1 selects the chip
+whenever the slot is *not* addressed, and the VIA fights RAM and ROM
+on the data bus every cycle.
+
+### Descending pin runs
+
+Pin 26 = D7, pin 33 = D0.
+Pin 35 = RS3, pin 38 = RS0.
+
+Both numbered opposite to the PA and PB runs on the same package.
+Reversing the data bus produces bit-mirrored reads and writes that
+look like a dead chip.
+
+### IRQB — check the part marking
+
+| Variant | IRQB output | Wiring |
+|---------|-------------|--------|
+| W65C22N, older NMOS/CMOS | open drain, pull down only | wire-OR, one pullup on the common line |
+| W65C22S | totem pole, drives both levels | logic OR gate, or a <0.5 V diode in series, forward biased when IRQB is low, plus a pullup |
+
+The W65C22S IRQB was meant for logically ORing rather than wire ORing.
+Tying an S variant directly to another driven IRQ line is a driver
+fight.
+
+With the ACIA on the same node, this decides the interrupt topology
+for the whole system. Settle it before wiring either chip.
+
+### Processor interface timing — 5 V, 14 MHz
+
+| Symbol | Parameter | Min |
+|--------|-----------|-----|
+| tACR / tACW | CSx, RSx, RWB setup | 10 ns |
+| tCAR / tCAW | CSx, RSx, RWB hold from PHI2 rising | 10 ns |
+| tDCW | data bus setup (write) | 10 ns |
+| tCDR | data bus delay (read) | 20 ns max |
+
+The 10 ns setup is what the decode chain must beat:
+
+    74HC573 → ATF22V10C → 74HC138 → CS2B
+
+all settled 10 ns before PHI2 rises.
+
+### W65C22S-specific
+
+- **No output current limiting.** The S variant can overdrive
+  connected circuitry. The NMOS 6522 and W65C22N have series
+  resistors built in. Add external resistors on PA/PB when driving
+  LEDs or an HD44780.
+- **Bus holding on every pin except PHI2.** A floating input holds
+  its last state rather than drifting — so a disconnected jumper can
+  look like a working connection until something changes it.
+
+---
+
+## Signal chain
+
+Active low end to end:
+
+    IOSEL low  →  '138 enabled  →  one Y low  →  CS2B low  →  VIA selected
+
+No inverters anywhere in the path.
+
+---
+
+## Sources
+
+- WDC W65C22 datasheet (W65C22N and W65C22S), Sept 13 2010
+- Standard 6522 DIP-40 pin numbering, which the W65C22 follows

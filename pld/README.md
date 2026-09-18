@@ -1,0 +1,3 @@
+I will be using the galette .pld to .jed converter.  From what I understand, the input format is mostly compatible with GALasm (see https://github.com/daveho/GALasm for documentation).
+
+Feel free to use the ATF22V10C which is still being made instead of the GAL22V10.

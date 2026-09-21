@@ -19,25 +19,25 @@
 .as                             ; 8-bit accumulator (emulation-mode reset state)
 .xs                             ; 8-bit index registers (emulation-mode reset state)
 
-VIA_ORB     equ $6000            ; VIA port B output register
-VIA_DDRB    equ $6002            ; VIA port B data direction register
+VIA_ORB     = $6000            ; VIA port B output register
+VIA_DDRB    = $6002            ; VIA port B data direction register
 
-STATUS_OK   equ $01
-STATUS_FAIL equ $02
+STATUS_OK   = $01
+STATUS_FAIL = $02
 
-BANK_FIRST  equ $01
-BANK_LAST   equ $07
-BANK_LIMIT  equ BANK_LAST+1
+BANK_FIRST  = $01
+BANK_LAST   = $07
+BANK_LIMIT  = BANK_LAST+1
 
 ; Direct-page (zero page) working storage.
-ptr_lo      equ $00              ; 24-bit pointer for [dp] addressing:
-ptr_hi      equ $01              ;   ptr_lo/ptr_hi/ptr_bank, low to high
-ptr_bank    equ $02
-rng_lo      equ $03              ; 16-bit LFSR state; also supplies the
-rng_hi      equ $04              ;   low/high bytes of the test offset
-count_lo    equ $05              ; tests remaining in the current bank
-count_hi    equ $06
-data_byte   equ $07              ; pseudo-random pattern under test
+ptr_lo      = $00              ; 24-bit pointer for [dp] addressing:
+ptr_hi      = $01              ;   ptr_lo/ptr_hi/ptr_bank, low to high
+ptr_bank    = $02
+rng_lo      = $03              ; 16-bit LFSR state; also supplies the
+rng_hi      = $04              ;   low/high bytes of the test offset
+count_lo    = $05              ; tests remaining in the current bank
+count_hi    = $06
+data_byte   = $07              ; pseudo-random pattern under test
 
     org $8000
 

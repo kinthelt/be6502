@@ -13,34 +13,33 @@
 ; On completion, $01 is written to VIA port B if every comparison
 ; succeeded, or $02 as soon as the first mismatch is found.
 ;
-; Assemble with cc65:
-;   ca65 -o memtest.o memtest.s
-;   ld65 -C memtest.cfg -o memtest.bin memtest.o
+; Assemble with vasm (6502 backend, oldstyle syntax):
+;   vasm6502_oldstyle -816 -Fbin -dotdir -o memtest.bin memtest.s
 
-.p816
-.a8
-.i8
+.as                             ; 8-bit accumulator (emulation-mode reset state)
+.xs                             ; 8-bit index registers (emulation-mode reset state)
 
-.segment "CODE"
+VIA_ORB     equ $6000            ; VIA port B output register
+VIA_DDRB    equ $6002            ; VIA port B data direction register
 
-VIA_ORB     = $6000            ; VIA port B output register
-VIA_DDRB    = $6002            ; VIA port B data direction register
+STATUS_OK   equ $01
+STATUS_FAIL equ $02
 
-STATUS_OK   = $01
-STATUS_FAIL = $02
-
-BANK_FIRST  = $01
-BANK_LAST   = $07
+BANK_FIRST  equ $01
+BANK_LAST   equ $07
+BANK_LIMIT  equ BANK_LAST+1
 
 ; Direct-page (zero page) working storage.
-ptr_lo      = $00              ; 24-bit pointer for [dp] addressing:
-ptr_hi      = $01              ;   ptr_lo/ptr_hi/ptr_bank, low to high
-ptr_bank    = $02
-rng_lo      = $03              ; 16-bit LFSR state; also supplies the
-rng_hi      = $04              ;   low/high bytes of the test offset
-count_lo    = $05              ; tests remaining in the current bank
-count_hi    = $06
-data_byte   = $07              ; pseudo-random pattern under test
+ptr_lo      equ $00              ; 24-bit pointer for [dp] addressing:
+ptr_hi      equ $01              ;   ptr_lo/ptr_hi/ptr_bank, low to high
+ptr_bank    equ $02
+rng_lo      equ $03              ; 16-bit LFSR state; also supplies the
+rng_hi      equ $04              ;   low/high bytes of the test offset
+count_lo    equ $05              ; tests remaining in the current bank
+count_hi    equ $06
+data_byte   equ $07              ; pseudo-random pattern under test
+
+    org $8000
 
 reset:
     sei
@@ -90,16 +89,17 @@ test_loop:
     bne     fail
 
     lda     count_lo
-    bne     :+
+    bne     count_dec
     dec     count_hi
-:   dec     count_lo
+count_dec:
+    dec     count_lo
     lda     count_lo
     ora     count_hi
     bne     test_loop
 
     inc     ptr_bank
     lda     ptr_bank
-    cmp     #(BANK_LAST + 1)
+    cmp     #BANK_LIMIT
     bne     bank_loop
 
 success:
@@ -128,18 +128,18 @@ lfsr_done:
 irq_nmi_stub:
     rti
 
-.segment "VECTORS"
-    .addr   irq_nmi_stub        ; $FFE4 COP    (native)
-    .addr   irq_nmi_stub        ; $FFE6 BRK    (native)
-    .addr   irq_nmi_stub        ; $FFE8 ABORTB (native)
-    .addr   irq_nmi_stub        ; $FFEA NMIB   (native)
-    .addr   $0000               ; $FFEC reserved
-    .addr   irq_nmi_stub        ; $FFEE IRQB   (native)
-    .addr   $0000               ; $FFF0 reserved
-    .addr   $0000               ; $FFF2 reserved
-    .addr   irq_nmi_stub        ; $FFF4 COP    (emulation)
-    .addr   $0000               ; $FFF6 reserved
-    .addr   irq_nmi_stub        ; $FFF8 ABORTB (emulation)
-    .addr   irq_nmi_stub        ; $FFFA NMIB   (emulation)
-    .addr   reset               ; $FFFC RESET
-    .addr   irq_nmi_stub        ; $FFFE IRQB/BRK (emulation)
+    org $ffe4
+    dc.w irq_nmi_stub      ; $FFE4 COP    (native)
+    dc.w irq_nmi_stub      ; $FFE6 BRK    (native)
+    dc.w irq_nmi_stub      ; $FFE8 ABORTB (native)
+    dc.w irq_nmi_stub      ; $FFEA NMIB   (native)
+    dc.w $0000             ; $FFEC reserved
+    dc.w irq_nmi_stub      ; $FFEE IRQB   (native)
+    dc.w $0000             ; $FFF0 reserved
+    dc.w $0000             ; $FFF2 reserved
+    dc.w irq_nmi_stub      ; $FFF4 COP    (emulation)
+    dc.w $0000             ; $FFF6 reserved
+    dc.w irq_nmi_stub      ; $FFF8 ABORTB (emulation)
+    dc.w irq_nmi_stub      ; $FFFA NMIB   (emulation)
+    dc.w reset             ; $FFFC RESET
+    dc.w irq_nmi_stub      ; $FFFE IRQB/BRK (emulation)

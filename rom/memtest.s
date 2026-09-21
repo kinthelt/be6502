@@ -129,17 +129,17 @@ irq_nmi_stub:
     rti
 
     org $ffe4
-    dc.w irq_nmi_stub      ; $FFE4 COP    (native)
-    dc.w irq_nmi_stub      ; $FFE6 BRK    (native)
-    dc.w irq_nmi_stub      ; $FFE8 ABORTB (native)
-    dc.w irq_nmi_stub      ; $FFEA NMIB   (native)
-    dc.w $0000             ; $FFEC reserved
-    dc.w irq_nmi_stub      ; $FFEE IRQB   (native)
-    dc.w $0000             ; $FFF0 reserved
-    dc.w $0000             ; $FFF2 reserved
-    dc.w irq_nmi_stub      ; $FFF4 COP    (emulation)
-    dc.w $0000             ; $FFF6 reserved
-    dc.w irq_nmi_stub      ; $FFF8 ABORTB (emulation)
-    dc.w irq_nmi_stub      ; $FFFA NMIB   (emulation)
-    dc.w reset             ; $FFFC RESET
-    dc.w irq_nmi_stub      ; $FFFE IRQB/BRK (emulation)
+    word irq_nmi_stub      ; $FFE4 COP    (native)
+    word irq_nmi_stub      ; $FFE6 BRK    (native)
+    word irq_nmi_stub      ; $FFE8 ABORTB (native)
+    word irq_nmi_stub      ; $FFEA NMIB   (native)
+    word $0000             ; $FFEC reserved
+    word irq_nmi_stub      ; $FFEE IRQB   (native)
+    word $0000             ; $FFF0 reserved
+    word $0000             ; $FFF2 reserved
+    word irq_nmi_stub      ; $FFF4 COP    (emulation)
+    word $0000             ; $FFF6 reserved
+    word irq_nmi_stub      ; $FFF8 ABORTB (emulation)
+    word irq_nmi_stub      ; $FFFA NMIB   (emulation)
+    word reset             ; $FFFC RESET
+    word irq_nmi_stub      ; $FFFE IRQB/BRK (emulation)

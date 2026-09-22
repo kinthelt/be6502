@@ -19,8 +19,8 @@
 VIA_ORB     = $6000            ; VIA port B output register
 VIA_DDRB    = $6002            ; VIA port B data direction register
 
-STATUS_OK   = $01
-STATUS_FAIL = $02
+STATUS_OK   = $80
+STATUS_FAIL = $40
 
 BANK_FIRST  = $01
 BANK_LAST   = $07
@@ -66,6 +66,7 @@ reset:
 
 bank_loop:
     ; One full LFSR period ($FFFF tests) per bank.
+    sta     VIA_ORB
     lda     #$ff
     sta     count_lo
     sta     count_hi

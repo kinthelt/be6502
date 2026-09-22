@@ -50,6 +50,10 @@ reset:
     ; VIA port B is all outputs so the status byte can be written.
     lda     #$ff
     sta     VIA_DDRB
+    
+    ; Blank out all the LEDs
+    lda     #$00
+    sta     VIA_ORB
 
     ; Seed the LFSR. Must be non-zero or it will never advance.
     lda     #$ac

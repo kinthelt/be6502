@@ -1,8 +1,12 @@
 GAL22V10
-816DEC01
+816DEC02
 
-PHI2 RWB  A12  A13  A14    A15   A16   A17   A18    A23    NC GND
-NC   NC   NC   NC   VRAMCE RAMCE ROMCE IOSEL OEGATE WEGATE NC VCC
+CLK2 RWB  A12  A13  A14    A15   A16   A17   A18    A23    NC   GND
+NC   LE   NC   NC   VRAMCE RAMCE ROMCE IOSEL OEGATE WEGATE PHI2 VCC
+
+PHI2.R = /PHI2
+
+LE = /PHI2 * /CLK2
 
 /ROMCE = /A23 * /A18 * /A17 * /A16 * A15
 
@@ -16,27 +20,36 @@ NC   NC   NC   NC   VRAMCE RAMCE ROMCE IOSEL OEGATE WEGATE NC VCC
 
 /WEGATE = PHI2 * /RWB
 
+AR = GND
+
+SP = GND
+
 DESCRIPTION
 
-W65C816S address decode. Target: ATF22V10C-7PX.
+W65C816S address decode, clock divider and bank latch enable.
+Target: ATF22V10C-7PX.
+
+Supersedes 816DEC01. Changes: PHI2 is now generated here as a divide-by-two
+of a 2x oscillator on pin 1, and LE for the bank latch is generated here as
+well. See NOTE 6.
 
 
 PIN ASSIGNMENT
 
- 1  PHI2    CPU pin 37, system clock
+ 1  CLK2    oscillator at 2x the intended PHI2 frequency
  2  RWB     CPU pin 34
  3  A12     CPU pin 22 (declared, not used -- see NOTE 4)
  4  A13     CPU pin 23
  5  A14     CPU pin 24
  6  A15     CPU pin 25
- 7  A16     74HC573 Q0
- 8  A17     74HC573 Q1
- 9  A18     74HC573 Q2
-10  A23     74HC573 Q7
+ 7  A16     74xx573 Q0
+ 8  A17     74xx573 Q1
+ 9  A18     74xx573 Q2
+10  A23     74xx573 Q7
 11  NC
 12  GND
 13  NC
-14  NC      spare macrocell
+14  LE      74xx573 pin 11 LE
 15  NC      spare macrocell
 16  NC      spare macrocell
 17  VRAMCE  62256 pin 20  /CE
@@ -45,8 +58,10 @@ PIN ASSIGNMENT
 20  IOSEL   74HC138 pin 4  /E1
 21  OEGATE  AS6C4008 /OE, 62256 /OE, AT28C256 /OE
 22  WEGATE  AS6C4008 /WE, 62256 /WE
-23  NC      spare macrocell
-24  VCC
+23  PHI2    CPU pin 37, W65C22 pin 25, W65C51N pin 27
+
+The 74xx573 /OE (pin 1) is tied to GND. Everything that previously took the
+clock from the oscillator now takes it from pin 23.
 
 
 MEMORY MAP
@@ -80,14 +95,15 @@ bank byte rather than write data.
 NOTE 2 -- CHIP SELECTS ARE NOT PHI2 GATED
 
 ROMCE, RAMCE, VRAMCE and IOSEL depend on A16-A23, which come from the
-74HC573. That latch is transparent while PHI2 is low, so those inputs are
-briefly unsettled at the start of each PHI2 low period and the selects can
-glitch there.
+74xx573. That latch is transparent during the second quarter of each cycle
+(see NOTE 6), so those inputs are briefly unsettled there and the selects
+can glitch during that window.
 
 The glitches are harmless. Writes are blocked because WEGATE requires PHI2
-high. Reads latch nothing -- the CPU samples D0-D7 at the falling edge of
-PHI2, by which point the bank byte has long since settled. The 65C22 and
-65C51 likewise sample CS and RS at the falling edge of PHI2.
+high, and the latch is closed for the whole of PHI2 high. Reads latch
+nothing -- the CPU samples D0-D7 at the falling edge of PHI2, by which point
+the bank byte has long since settled. The 65C22 and 65C51 likewise sample CS
+and RS at the falling edge of PHI2.
 
 Leaving the selects ungated gives ROM and RAM the longest possible access
 window, which matters at higher clock speeds.
@@ -102,8 +118,8 @@ A19-A22 are deliberately left out of the array. Nothing is populated above
 bank $07 other than video, so the aliasing costs nothing today.
 
 Tighten this first if a second RAM device or a second video region is ever
-added. Four spare macrocells and four free input pins (11, 13, and two of
-the spares reconfigured as inputs) are available for that.
+added. Two spare macrocells and three free input pins (11, 13, and one spare
+reconfigured as an input) are available for that.
 
 
 NOTE 4 -- A12
@@ -122,3 +138,62 @@ NOTE 5 -- ATF22V10C POWER-DOWN
 The power-down feature is enabled at the silicon level on this part and is
 not controlled from this file. Disable it at programming time by writing
 row 59, then verify pin 4 behaviour on the bench after the first burn.
+
+
+NOTE 6 -- CLOCK DIVIDER AND LATCH ENABLE
+
+Pin 1 takes an oscillator at twice the intended PHI2 frequency. PHI2 is a
+registered output that toggles on every rising edge of CLK2, so PHI2 has a
+50% duty cycle at half the oscillator frequency.
+
+LE is high only during the second quarter of each bus cycle:
+
+  0     PHI2 falls, new cycle starts; LE low, latch holds previous bank
+  T/4   CLK2 falls, LE rises, latch transparent, new bank bits pass through
+  T/2   CLK2 rises, PHI2 rises and LE falls on the same edge, latch closed
+  T     PHI2 falls
+
+This bounds both edges of LE, which a plain inverted PHI2 cannot do.
+
+Closing edge. LE falls at CLK2 rising plus the GAL's combinational delay
+(7.5 ns max). The latch needs the bank byte for its hold time after that
+(2 ns for a 74ACT573). PHI2 rises at the same CLK2 edge plus the registered
+clock-to-output delay, and the CPU guarantees the bank byte for 10 ns past
+that. The margin is the clock-to-output delay plus 0.5 ns, and it holds
+whatever that delay turns out to be, because both signals come off the same
+edge of the same device.
+
+Opening edge. LE rises a quarter cycle after PHI2 falls. WEGATE has long
+since released (7.5 ns max after PHI2 falls) and the CPU's read data hold
+time (10 ns) has passed, so the latch cannot disturb A16-A23 while an access
+is still in progress. This requires T/4 to exceed roughly 9 ns, which is
+satisfied at any clock this design can run.
+
+Speed cost. The latch opens at T/4 rather than immediately, but the bank
+byte does not arrive until 33 ns after PHI2 falls in any case. For cycles
+longer than 132 ns the late opening costs nothing at all. The binding read
+constraint is tACE: bank valid at RAM 44 ns, RAMCE 51.5 ns, plus 55 ns
+access and 10 ns CPU setup gives a minimum cycle of 116.5 ns, about 8.5 MHz.
+
+Single-stepping. Each manual clock pulse is now half a bus cycle. Two pulses
+advance the CPU by one cycle.
+
+
+NOTE 7 -- ITEMS TO VERIFY BEFORE RELYING ON THIS FILE
+
+a) Pin 1 is used both as the register clock and as a logic term in LE.
+   The GAL22V10 architecture allows this, but confirm Galette accepts it.
+   If it does not, divide externally with a 74AC74, feed CLK2 on pin 1 and
+   PHI2 on pin 11 as plain inputs, delete the PHI2, AR and SP equations,
+   and keep LE combinational.
+
+b) AR and SP syntax. GALasm requires asynchronous reset and synchronous
+   preset terms for designs with registered outputs. Confirm the exact
+   form Galette expects against the GALasm documentation before burning.
+
+c) Power-up phase. The 22V10's registers power up reset, so check on the
+   bench which phase PHI2 starts in and that reset behaves.
+
+d) Output level. PHI2 now drives the CPU clock input from a GAL output.
+   The ATF22V10C guarantees VOH of only 2.4 V at 4 mA, while the W65C816S
+   needs 3.5 V. Measure it.

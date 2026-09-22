@@ -10,20 +10,18 @@
 ; LFSR (taps 16/14/13/11, period 65535), run for one full period per bank
 ; -- effectively exhaustive coverage of each 64K bank.
 ;
-; On completion, $01 is written to VIA port B if every comparison
-; succeeded, or $02 as soon as the first mismatch is found.
+; On completion, $80 is written to VIA port B if every comparison
+; succeeded, or $40 as soon as the first mismatch is found. While a bank
+; is under test, its bank number ($01-$07) is shown on VIA port B.
 ;
 ; Assemble with vasm (6502 backend, oldstyle syntax):
 ;   vasm6502_oldstyle -816 -Fbin -dotdir -o memtest.bin memtest.s
 
-.as                             ; 8-bit accumulator (emulation-mode reset state)
-.xs                             ; 8-bit index registers (emulation-mode reset state)
-
 VIA_ORB     = $6000            ; VIA port B output register
 VIA_DDRB    = $6002            ; VIA port B data direction register
 
-STATUS_OK   = $01
-STATUS_FAIL = $02
+STATUS_OK   = $80
+STATUS_FAIL = $40
 
 BANK_FIRST  = $01
 BANK_LAST   = $07
@@ -39,9 +37,12 @@ count_lo    = $05              ; tests remaining in the current bank
 count_hi    = $06
 data_byte   = $07              ; pseudo-random pattern under test
 
-    org $8000
+    .org $8000
 
 reset:
+.as                             ; 8-bit accumulator (emulation-mode reset state)
+.xs                             ; 8-bit index registers (emulation-mode reset state)
+
     sei
     cld
     ldx     #$ff
@@ -50,6 +51,10 @@ reset:
     ; VIA port B is all outputs so the status byte can be written.
     lda     #$ff
     sta     VIA_DDRB
+
+    ; Blank out all the LEDs
+    lda     #$00
+    sta     VIA_ORB
 
     ; Seed the LFSR. Must be non-zero or it will never advance.
     lda     #$ac
@@ -61,6 +66,11 @@ reset:
     sta     ptr_bank
 
 bank_loop:
+    ; A now holds the bank number about to be tested (BANK_FIRST on
+    ; first entry, or ptr_bank as just incremented on later ones) --
+    ; show it on the LEDs.
+    sta     VIA_ORB
+
     ; One full LFSR period ($FFFF tests) per bank.
     lda     #$ff
     sta     count_lo
@@ -128,7 +138,7 @@ lfsr_done:
 irq_nmi_stub:
     rti
 
-    org $ffe4
+    .org $ffe4
     word irq_nmi_stub      ; $FFE4 COP    (native)
     word irq_nmi_stub      ; $FFE6 BRK    (native)
     word irq_nmi_stub      ; $FFE8 ABORTB (native)

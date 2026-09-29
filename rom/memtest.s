@@ -26,9 +26,8 @@
 ; pass 2 succeeded, or $40 as soon as the first mismatch is found.
 ; While a bank is under test (in either pass), its bank number
 ; ($01-$07) is shown on VIA port B.
-;
-; Assemble with vasm (6502 backend, oldstyle syntax):
-;   vasm6502_oldstyle -816 -Fbin -dotdir -o memtest.bin memtest.s
+
+.setcpu "65816"
 
 VIA_ORB     = $6000            ; VIA port B output register
 VIA_DDRB    = $6002            ; VIA port B data direction register
@@ -51,11 +50,11 @@ count_hi    = $06
 data_byte   = $07              ; pseudo-random pattern under test
 mode        = $08              ; $00 = write pass, $01 = verify pass
 
-    .org $8000
+.segment "CODE"
 
 reset:
-.as                            ; 8-bit accumulator (emulation-mode reset state)
-.xs                            ; 8-bit index registers (emulation-mode reset state)
+;.as                            ; 8-bit accumulator (emulation-mode reset state)
+;.xs                            ; 8-bit index registers (emulation-mode reset state)
 
     sei
     cld
@@ -176,22 +175,3 @@ lfsr_advance:
     sta     rng_hi
 lfsr_done:
     rts
-
-irq_nmi_stub:
-    rti
-
-    .org $ffe4
-    word irq_nmi_stub      ; $FFE4 COP    (native)
-    word irq_nmi_stub      ; $FFE6 BRK    (native)
-    word irq_nmi_stub      ; $FFE8 ABORTB (native)
-    word irq_nmi_stub      ; $FFEA NMIB   (native)
-    word $0000             ; $FFEC reserved
-    word irq_nmi_stub      ; $FFEE IRQB   (native)
-    word $0000             ; $FFF0 reserved
-    word $0000             ; $FFF2 reserved
-    word irq_nmi_stub      ; $FFF4 COP    (emulation)
-    word $0000             ; $FFF6 reserved
-    word irq_nmi_stub      ; $FFF8 ABORTB (emulation)
-    word irq_nmi_stub      ; $FFFA NMIB   (emulation)
-    word reset             ; $FFFC RESET
-    word irq_nmi_stub      ; $FFFE IRQB/BRK (emulation)

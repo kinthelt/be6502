@@ -1,32 +1,6 @@
-; Assemble with vasm (6502 backend, oldstyle syntax):
-;   vasm6502_oldstyle -816 -Fbin -dotdir -o memtest.bin memtest.s
+.setcpu "65C02"
 
-VIA_IORB    = $6000 ; VIA port B I/O register
-VIA_IORA    = $6001 ; VIA port A I/O register
-VIA_DDRB    = $6002 ; VIA port B data direction register
-VIA_DDRA    = $6003 ; VIA port A data direction register
-VIA_T1CL    = $6004 ; VIA T1 latches/counter
-VIA_T1CH    = $6005 ; VIA T1 high-order counter
-VIA_T1LL    = $6006 ; VIA T1 low-order latches
-VIA_T1LH    = $6007 ; VIA T1 high-order latches
-VIA_T2CL    = $6008 ; VIA T2 latches/counter
-VIA_T2CH    = $6009 ; VIA T2 high-order counter
-VIA_SR      = $600a ; VIA shift register
-VIA_ACR     = $600b ; VIA auxiliary control register
-VIA_PCR     = $600c ; VIA peripheral control register
-VIA_IFR     = $600d ; VIA interrupt flag register
-VIA_IER     = $600e ; VIA interrupt enable register
-VIA_NHIORA  = $600f ; VIA no-handshake port A I/O register
-
-ACIA_DR     = $7000 ; ACIA data register
-ACIA_SR     = $7001 ; ACIA status/reset
-ACIA_CMDR   = $7002 ; ACIA command register
-ACIA_CTLR   = $7003 ; ACIA control register
-
-BANK_FIRST  = $01
-BANK_LAST   = $07
-
-    .org $8000
+.segment "CODE"
 
 reset:
     ; Set stack to $0100-$01FF
@@ -146,27 +120,3 @@ half_bit_delay_1:
 
 halt:
     jmp     halt
-
-irq:
-    ; Clear ACIA interrupt flag
-    lda     ACIA_SR
-    rti
-
-nmi_stub:
-    rti
-
-    .org $ffe4
-    word nmi_stub      ; $FFE4 COP    (native)
-    word nmi_stub      ; $FFE6 BRK    (native)
-    word nmi_stub      ; $FFE8 ABORTB (native)
-    word nmi_stub      ; $FFEA NMIB   (native)
-    word $0000         ; $FFEC reserved
-    word nmi_stub      ; $FFEE IRQB   (native)
-    word $0000         ; $FFF0 reserved
-    word $0000         ; $FFF2 reserved
-    word nmi_stub      ; $FFF4 COP    (emulation)
-    word $0000         ; $FFF6 reserved
-    word nmi_stub      ; $FFF8 ABORTB (emulation)
-    word nmi_stub      ; $FFFA NMIB   (emulation)
-    word reset         ; $FFFC RESET
-    word irq           ; $FFFE IRQB/BRK (emulation)

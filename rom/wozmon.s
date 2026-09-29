@@ -1,33 +1,6 @@
-; Assemble with vasm (6502 backend, oldstyle syntax):
-;   vasm6502_oldstyle -816 -Fbin -dotdir -o memtest.bin memtest.s
+.setcpu "65C02"
+.segment "WOZMON"
 
-VIA_IORB    = $6000 ; VIA port B I/O register
-VIA_IORA    = $6001 ; VIA port A I/O register
-VIA_DDRB    = $6002 ; VIA port B data direction register
-VIA_DDRA    = $6003 ; VIA port A data direction register
-VIA_T1CL    = $6004 ; VIA T1 latches/counter
-VIA_T1CH    = $6005 ; VIA T1 high-order counter
-VIA_T1LL    = $6006 ; VIA T1 low-order latches
-VIA_T1LH    = $6007 ; VIA T1 high-order latches
-VIA_T2CL    = $6008 ; VIA T2 latches/counter
-VIA_T2CH    = $6009 ; VIA T2 high-order counter
-VIA_SR      = $600a ; VIA shift register
-VIA_ACR     = $600b ; VIA auxiliary control register
-VIA_PCR     = $600c ; VIA peripheral control register
-VIA_IFR     = $600d ; VIA interrupt flag register
-VIA_IER     = $600e ; VIA interrupt enable register
-VIA_NHIORA  = $600f ; VIA no-handshake port A I/O register
-
-ACIA_DR     = $7000 ; ACIA data register
-ACIA_SR     = $7001 ; ACIA status/reset
-ACIA_CMDR   = $7002 ; ACIA command register
-ACIA_CTLR   = $7003 ; ACIA control register
-
-BANK_FIRST  = $01
-BANK_LAST   = $07
-
-  .org $8000
-  .org $ff00
 
 XAML  = $24                            ; Last "opened" location Low
 XAMH  = $25                            ; Last "opened" location High
@@ -68,10 +41,11 @@ BACKSPACE:      DEY                    ; Back up text index.
                 BMI     GETLINE        ; Beyond start of line, reinitialize.
 
 NEXTCHAR:
-                LDA     ACIA_SR        ; Check status.
-                AND     #$08           ; Key ready?
+;                LDA     ACIA_SR        ; Check status.
+;                AND     #$08           ; Key ready?
+;                LDA     ACIA_DR        ; Load character. B7 will be '0'.
+                JSR     CHRIN          ; From BIOS
                 BEQ     NEXTCHAR       ; Loop until ready.
-                LDA     ACIA_DR        ; Load character. B7 will be '0'.
                 STA     IN,Y           ; Add to text buffer.
                 JSR     ECHO           ; Display character.
                 CMP     #$0D           ; CR?
@@ -202,16 +176,11 @@ PRHEX:
                 ADC     #$06           ; Add offset for letter.
 
 ECHO:
-                PHA                    ; Save A.
-                STA     ACIA_DR        ; Output character.
-                LDA     #$FF           ; Initialize delay loop.
-TXDELAY:        DEC                    ; Decrement A.
-                BNE     TXDELAY        ; Until A gets to 0.
-                PLA                    ; Restore A.
+                 JSR    CHROUT         ; From BIOS
+;                PHA                    ; Save A.
+;                STA     ACIA_DR        ; Output character.
+;                LDA     #$FF           ; Initialize delay loop.
+;TXDELAY:        DEC                    ; Decrement A.
+;                BNE     TXDELAY        ; Until A gets to 0.
+;                PLA                    ; Restore A.
                 RTS                    ; Return.
-
-  .org $FFFA
-
-                .word   $0F00          ; NMI vector
-                .word   RESET          ; RESET vector
-                .word   $0000          ; IRQ vector

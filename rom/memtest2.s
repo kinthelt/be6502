@@ -30,9 +30,8 @@
 ; VIA port B: $40 on failure; otherwise it shows a rotating pass
 ; counter as a heartbeat, since there's no defined "done" for a soak
 ; test that's meant to be left running.
-;
-; Assemble with vasm (6502 backend, oldstyle syntax):
-;   vasm6502_oldstyle -816 -Fbin -dotdir -o memtest2.bin memtest2.s
+
+.setcpu "65816"
 
 VIA_ORB     = $6000            ; VIA port B output register
 VIA_DDRB    = $6002            ; VIA port B data direction register
@@ -65,11 +64,11 @@ pattern     = $06              ; current bank-0 fill pattern
 expect      = $07              ; expected sentinel value, scratch
 pass_count  = $08              ; heartbeat counter shown on the LEDs
 
-    .org $8000
+.segment "CODE"
 
 reset:
-.as                             ; 8-bit accumulator (emulation-mode reset state)
-.xs                             ; 8-bit index registers (emulation-mode reset state)
+;.as                             ; 8-bit accumulator (emulation-mode reset state)
+;.xs                             ; 8-bit index registers (emulation-mode reset state)
 
     sei
     cld
@@ -218,22 +217,3 @@ fail:
 
 halt:
     jmp     halt
-
-irq_nmi_stub:
-    rti
-
-    .org $ffe4
-    word irq_nmi_stub      ; $FFE4 COP    (native)
-    word irq_nmi_stub      ; $FFE6 BRK    (native)
-    word irq_nmi_stub      ; $FFE8 ABORTB (native)
-    word irq_nmi_stub      ; $FFEA NMIB   (native)
-    word $0000             ; $FFEC reserved
-    word irq_nmi_stub      ; $FFEE IRQB   (native)
-    word $0000             ; $FFF0 reserved
-    word $0000             ; $FFF2 reserved
-    word irq_nmi_stub      ; $FFF4 COP    (emulation)
-    word $0000             ; $FFF6 reserved
-    word irq_nmi_stub      ; $FFF8 ABORTB (emulation)
-    word irq_nmi_stub      ; $FFFA NMIB   (emulation)
-    word reset             ; $FFFC RESET
-    word irq_nmi_stub      ; $FFFE IRQB/BRK (emulation)

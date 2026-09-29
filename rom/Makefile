@@ -1,23 +1,24 @@
-ASM=vasm6502_oldstyle
+AS       := ca65
+LD       := ld65
+LDFLAGS  := -C bios.cfg
 
-BIN=count.bin memtest.bin memtest2.bin rs232.bin wozmon.bin
+.SUFFIXES: .s .bin
+
+BIN=bios.sym count.bin memtest.bin memtest2.bin
 
 all: $(BIN)
 
-count.bin: count.s
-	$(ASM) -Fbin -dotdir $< -o count.bin
+bios.sym: bios.o
+	$(LD) $(LDFLAGS) -Ln $@ $<
 
-memtest.bin: memtest.s
-	$(ASM) -816 -Fbin -dotdir $< -o memtest.bin
+bios.o: bios.s wozmon.s
+	$(AS) $(ASFLAGS) -o $@ $<
 
-memtest2.bin: memtest2.s
-	$(ASM) -816 -Fbin -dotdir $< -o memtest2.bin
+%.o: %.s
+	$(AS) $(ASFLAGS) -o $@ $<
 
-rs232.bin: rs232.s
-	$(ASM) -816 -Fbin -dotdir $< -o rs232.bin
-
-wozmon.bin: wozmon.s
-	$(ASM) -816 -Fbin -dotdir $< -o wozmon.bin
+%.bin: %.o bios.o
+	$(LD) $(LDFLAGS) -o $@ $< bios.o
 
 clean:
-	rm -f $(BIN)
+	rm -f $(BIN) *.o

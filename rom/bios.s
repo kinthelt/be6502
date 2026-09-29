@@ -49,8 +49,24 @@ TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
 LOAD:
   rts
 
+LOAD_L:
+  phb
+  phk
+  plb
+  jsr LOAD
+  plb
+  rtl
+
 SAVE:
   rts
+
+SAVE_L:
+  phb
+  phk
+  plb
+  jsr SAVE
+  plb
+  rtl
 
 ; Sets ACIA's control and command registers
 ; No return value.
@@ -86,6 +102,14 @@ CHRIN:
   clc
   rts
 
+CHRIN_L:
+  phb
+  phk
+  plb
+  jsr CHRIN
+  plb
+  rtl
+
 ; Output a character (from the A register) to the serial interface.
 ;
 ; Modifies: flags
@@ -101,6 +125,14 @@ CHROUT:
   bit VIA_IFR         ; V = T1 timed out
   bvc @tx_wait
   rts
+
+CHROUT_L:
+  phb
+  phk
+  plb
+  jsr CHROUT
+  plb
+  rtl
 
 ; Initialize the read buffer
 ;
@@ -201,7 +233,7 @@ NMI_HANDLER_N:
 
 .include "wozmon.s"
 
-.segment "VECTORS"
+.segment "RESETVEC"
                 ; Native mode
                 .word   NMI_HANDLER_N  ; $FFE4 COP vector
                 .word   NMI_HANDLER_N  ; $FFE6 BRK vector

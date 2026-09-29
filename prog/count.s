@@ -15,7 +15,7 @@
 VIA_ORB     = $6000            ; VIA port B output register
 VIA_DDRB    = $6002            ; VIA port B data direction register
 
-.segment "CODE"
+.segment "CODE2"
 reset:
     clc
     xce                        ; Native mode (already set if started with N)
@@ -25,11 +25,11 @@ reset:
 .i16
 
     lda #$ff
-    sta VIA_DDRB               ; Port B all outputs
+    sta f:VIA_DDRB               ; Port B all outputs
     lda #$00
 
 loop:
-    sta VIA_ORB
+    sta f:VIA_ORB
     inc a
     jsr delay
     bra loop

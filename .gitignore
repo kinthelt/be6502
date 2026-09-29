@@ -1,4 +1,5 @@
 *.o
 *.bin
+*.sym
 *.swp
 *.swo

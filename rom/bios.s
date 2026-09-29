@@ -30,8 +30,8 @@ BANK_LAST   = $07
 PHI2_HZ     = 6000000
 ;PHI2_HZ     = 1000000
 BAUD        = 19200
-;TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
-TX_CYCLES = 3282
+TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
+;TX_CYCLES = 3282
 
 ; Input a character from the serial interface.
 ; On return, carry flag indicates whether a key was pressed

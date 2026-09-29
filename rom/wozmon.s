@@ -41,13 +41,9 @@ BACKSPACE:      DEY                    ; Back up text index.
                 BMI     GETLINE        ; Beyond start of line, reinitialize.
 
 NEXTCHAR:
-;                LDA     ACIA_SR        ; Check status.
-;                AND     #$08           ; Key ready?
-;                LDA     ACIA_DR        ; Load character. B7 will be '0'.
                 JSR     CHRIN          ; From BIOS
-                BEQ     NEXTCHAR       ; Loop until ready.
+                BCC     NEXTCHAR       ; Loop until ready.
                 STA     IN,Y           ; Add to text buffer.
-                JSR     ECHO           ; Display character.
                 CMP     #$0D           ; CR?
                 BNE     NOTCR          ; No.
 

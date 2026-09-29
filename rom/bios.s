@@ -1,5 +1,16 @@
-.setcpu "65816"
+.setcpu "65C02"
 .debuginfo
+
+.zeropage
+.ifdef ZP_START0
+.org ZP_START0
+.endif
+READ_PTR:    .res 1
+WRITE_PTR:   .res 1
+
+.segment "INPUT_BUFFER"
+INPUT_BUFFER: .res $100
+
 .segment "BIOS"
 
 VIA_IORB    = $6000 ; VIA port B I/O register
@@ -33,20 +44,45 @@ BAUD        = 19200
 TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
 ;TX_CYCLES = 3282
 
+; Dummy functions, to be completed later
+
+LOAD:
+  rts
+
+SAVE:
+  rts
+
+; Sets ACIA's control and command registers
+; No return value.
+;
+; Modifies: A
+RS232_SETUP:
+  ;lda #$1f         ; 8-N-1, 19200 baud
+  lda #$10         ; 8-N-1, 115.2k baud
+  sta ACIA_CTLR
+  lda #$89         ; No parity, no echo, yes interrupts
+  sta ACIA_CMDR
+  cld              ; Clear decimal arithmetic mode
+  jsr INIT_BUFFER
+  cli
+  rts
+
 ; Input a character from the serial interface.
 ; On return, carry flag indicates whether a key was pressed
 ; If a key was pressed, the key value will be in the A register
 ;
 ; Modifies: flags, A
 CHRIN:
-  lda ACIA_SR
-  and #$08
+  phx
+  jsr BUFFER_SIZE
   beq @no_keypressed
-  lda ACIA_DR
+  jsr READ_BUFFER
   jsr CHROUT
+  plx
   sec
   rts
 @no_keypressed:
+  plx
   clc
   rts
 
@@ -54,21 +90,74 @@ CHRIN:
 ;
 ; Modifies: flags
 CHROUT:
-    sta     ACIA_DR
-    pha
-    lda     #<TX_CYCLES
-    sta     VIA_T1CL
-    lda     #>TX_CYCLES
-    sta     VIA_T1CH        ; start timer, clear flag
-    pla
+  sta ACIA_DR
+  pha
+  lda #<TX_CYCLES
+  sta VIA_T1CL
+  lda #>TX_CYCLES
+  sta VIA_T1CH        ; start timer, clear flag
+  pla
 @tx_wait:
-    bit     VIA_IFR         ; V = T1 timed out
-    bvc     @tx_wait
-    rts
+  bit VIA_IFR         ; V = T1 timed out
+  bvc @tx_wait
+  rts
+
+; Initialize the read buffer
+;
+; Modifies: flags, A
+INIT_BUFFER:
+  lda READ_PTR
+  sta WRITE_PTR
+  rts
+
+; Write a character to the circular input buffer
+;
+; Reads: A
+; Modifies: flags, X
+WRITE_BUFFER:
+  ldx WRITE_PTR
+  sta INPUT_BUFFER,x
+  inc WRITE_PTR
+  rts
+
+; Read a character from the circular input buffer
+;
+; Modifies: flags, A, X
+READ_BUFFER:
+  ldx READ_PTR
+  lda INPUT_BUFFER,x
+  inc READ_PTR
+  rts
+
+; Return the number of unread bytes in the circular input buffer
+;
+; Modifies: flags, A
+BUFFER_SIZE:
+  lda WRITE_PTR
+  sec
+  sbc READ_PTR
+  rts
+
+; Interrupt request handler (emulation mode)
+IRQ_HANDLER_E:
+  pha
+  phx
+  lda ACIA_SR
+  ; For now, assume the only source of interrupts is
+  ; incoming data from the UART
+  lda ACIA_DR
+  jsr WRITE_BUFFER
+  plx
+  pla
+  rti
+
+; NMI request handler (emulation mode)
+NMI_HANDLER_E:
+  rti
 
 .include "wozmon.s"
 
 .segment "RESETVEC"
-                .word   $0F00          ; NMI vector
+                .word   NMI_HANDLER_E  ; NMI vector
                 .word   RESET          ; RESET vector
-                .word   $0000          ; IRQ vector
+                .word   IRQ_HANDLER_E  ; IRQ vector

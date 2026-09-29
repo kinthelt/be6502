@@ -14,10 +14,7 @@ MODE  = $2B                            ; $00=XAM, $7F=STOR, $AE=BLOCK XAM
 IN    = $0200                          ; Input buffer
 
 RESET:
-                LDA     #$1F           ; 8-N-1, 19200 baud.
-                STA     ACIA_CTLR
-                LDA     #$0B           ; No parity, no echo, no interrupts.
-                STA     ACIA_CMDR
+                JSR     RS232_SETUP
                 LDA     #$1B           ; Begin with escape.
 
 NOTCR:
@@ -34,6 +31,8 @@ ESCAPE:
 
 GETLINE:
                 LDA     #$0D           ; Send CR
+                JSR     ECHO
+                LDA     #$0A           ; Send LF
                 JSR     ECHO
 
                 LDY     #$01           ; Initialize text index.
@@ -67,7 +66,7 @@ NEXTITEM:
                 CMP     #$3A           ; ":"?
                 BEQ     SETSTOR        ; Yes, set STOR mode.
                 CMP     #$52           ; "R"?
-                BEQ     RUN            ; Yes, run user program.
+                BEQ     RUNPROG        ; Yes, run user program.
                 STX     L              ; $00 -> L.
                 STX     H              ;    and H.
                 STY     YSAV           ; Save Y for comparison
@@ -110,7 +109,7 @@ NOTHEX:
                 INC     STH            ; Add carry to 'store index' high order.
 TONEXTITEM:     JMP     NEXTITEM       ; Get next command item.
 
-RUN:
+RUNPROG:
                 JMP     (XAML)         ; Run at current XAM index.
 
 NOTSTOR:
@@ -127,6 +126,8 @@ NXTPRNT:
                 BNE     PRDATA         ; NE means no address to print.
                 LDA     #$0D           ; CR.
                 JSR     ECHO           ; Output it.
+                LDA     #$0A           ; Send LF
+                JSR     ECHO
                 LDA     XAMH           ; 'Examine index' high-order byte.
                 JSR     PRBYTE         ; Output it in hex format.
                 LDA     XAML           ; Low-order 'examine index' byte.
@@ -172,11 +173,5 @@ PRHEX:
                 ADC     #$06           ; Add offset for letter.
 
 ECHO:
-                 JSR    CHROUT         ; From BIOS
-;                PHA                    ; Save A.
-;                STA     ACIA_DR        ; Output character.
-;                LDA     #$FF           ; Initialize delay loop.
-;TXDELAY:        DEC                    ; Decrement A.
-;                BNE     TXDELAY        ; Until A gets to 0.
-;                PLA                    ; Restore A.
+                JSR     CHROUT         ; From BIOS
                 RTS                    ; Return.

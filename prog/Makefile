@@ -4,7 +4,7 @@ LDFLAGS := -C mem.cfg
 
 .SUFFIXES: .s .bin
 
-BIN=count.bin
+BIN=count.bin memtest.bin
 
 all: $(BIN)
 

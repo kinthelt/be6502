@@ -1,2 +1,2 @@
 #!/bin/bash
-tio --baudrate 19200 --output-delay 2 --map ICRNL,INLCRNL,ONLCRNL $1
+tio --baudrate 115200 --output-delay 2 --map INLCRNL $1

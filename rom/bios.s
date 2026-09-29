@@ -1,4 +1,4 @@
-.setcpu "65C02"
+.setcpu "65816"
 .debuginfo
 
 .zeropage
@@ -155,9 +155,66 @@ IRQ_HANDLER_E:
 NMI_HANDLER_E:
   rti
 
+; Interrupt request handler (native mode)
+;
+; The interrupted program may be using 16-bit registers, any data bank
+; and any direct page, so save all of them, then switch to 8-bit
+; registers, data bank $00 and direct page $0000 for the buffer code.
+; The CPU has already pushed the program bank and set it to $00, and
+; RTI restores the register widths along with the flags.
+IRQ_HANDLER_N:
+  rep #$30            ; 16-bit A, X, Y so the full registers are saved
+.a16
+.i16
+  pha
+  phx
+  phy                 ; SEP #$30 below clears the high bytes of X and Y
+  phb
+  phd
+  pea $0000
+  pld                 ; Direct page = $0000
+  sep #$30            ; 8-bit A, X, Y
+.a8
+.i8
+  phk                 ; Program bank is $00 in an interrupt
+  plb                 ; Data bank = $00
+  lda ACIA_SR
+  ; For now, assume the only source of interrupts is
+  ; incoming data from the UART
+  lda ACIA_DR
+  jsr WRITE_BUFFER
+  rep #$30
+.a16
+.i16
+  pld
+  plb
+  ply
+  plx
+  pla
+  rti
+.a8
+.i8
+
+; NMI, BRK, COP and ABORT handler (native mode)
+NMI_HANDLER_N:
+  rti
+
 .include "wozmon.s"
 
-.segment "RESETVEC"
-                .word   NMI_HANDLER_E  ; NMI vector
-                .word   RESET          ; RESET vector
-                .word   IRQ_HANDLER_E  ; IRQ vector
+.segment "VECTORS"
+                ; Native mode
+                .word   NMI_HANDLER_N  ; $FFE4 COP vector
+                .word   NMI_HANDLER_N  ; $FFE6 BRK vector
+                .word   NMI_HANDLER_N  ; $FFE8 ABORT vector
+                .word   NMI_HANDLER_N  ; $FFEA NMI vector
+                .word   $0000          ; $FFEC reserved
+                .word   IRQ_HANDLER_N  ; $FFEE IRQ vector
+                ; Emulation mode
+                .word   $0000          ; $FFF0 reserved
+                .word   $0000          ; $FFF2 reserved
+                .word   NMI_HANDLER_E  ; $FFF4 COP vector
+                .word   $0000          ; $FFF6 reserved
+                .word   NMI_HANDLER_E  ; $FFF8 ABORT vector
+                .word   NMI_HANDLER_E  ; $FFFA NMI vector
+                .word   RESET          ; $FFFC RESET vector
+                .word   IRQ_HANDLER_E  ; $FFFE IRQ/BRK vector

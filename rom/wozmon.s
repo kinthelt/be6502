@@ -78,6 +78,7 @@ BACKSPACE:      DEY                    ; Back up text index.
 NEXTCHAR:
                 JSR     CHRIN          ; From BIOS
                 BCC     NEXTCHAR       ; Loop until ready.
+                JSR     CHROUT         ; Echo it
                 STA     IN,Y           ; Add to text buffer.
                 CMP     #$0D           ; CR?
                 BNE     NOTCR          ; No.

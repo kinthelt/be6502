@@ -71,16 +71,20 @@ SAVE_L:
 ; Sets ACIA's control and command registers
 ; No return value.
 ;
-; Modifies: A
-RS232_SETUP:
+; Modifies: flags
+ACIA_SETUP:
   ;lda #$1f         ; 8-N-1, 19200 baud
+  pha
   lda #$10         ; 8-N-1, 115.2k baud
   sta ACIA_CTLR
   lda #$89         ; No parity, no echo, yes interrupts
   sta ACIA_CMDR
-  cld              ; Clear decimal arithmetic mode
+  lda VIA_ACR
+  and #$1F         ; Clear T1 mode bits and T2 mode bits
+  sta VIA_ACR
   jsr INIT_BUFFER
   cli
+  pla
   rts
 
 ; Input a character from the serial interface.
@@ -117,13 +121,14 @@ CHROUT:
   sta ACIA_DR
   pha
   lda #<TX_CYCLES
-  sta VIA_T1CL
+  sta VIA_T2CL
   lda #>TX_CYCLES
-  sta VIA_T1CH        ; start timer, clear flag
-  pla
+  sta VIA_T2CH        ; start timer, clear flag
+  lda #$20            ; IFR5 = T2 timed out
 @tx_wait:
   bit VIA_IFR         ; V = T1 timed out
-  bvc @tx_wait
+  beq @tx_wait
+  pla
   rts
 
 CHROUT_L:

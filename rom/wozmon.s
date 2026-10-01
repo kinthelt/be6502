@@ -50,7 +50,7 @@ MODE  = $2E                            ; $00=XAM, $7F=STOR, $AE=BLOCK XAM
 IN    = $0200                          ; Input buffer
 
 RESET:
-                JSR     RS232_SETUP
+                JSR     ACIA_SETUP
                 LDA     #$1B           ; Begin with escape.
 
 NOTCR:

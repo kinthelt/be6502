@@ -81,13 +81,25 @@ CHRIN:
   jsr BUFFER_SIZE
   beq @no_keypressed
   jsr READ_BUFFER
-  jsr CHROUT
   plx
   sec
   rts
 @no_keypressed:
   plx
   clc
+  rts
+
+; Input a character from the serial interface.
+; On return, carry flag indicates whether a key was pressed
+; If a key was pressed, it is echoed and the key value will be
+; in the A register
+;
+; Modifies: flags, A
+CHRIN_ECHO:
+  jsr CHRIN
+  bcc @no_keypressed_echo
+  jsr CHROUT
+@no_keypressed_echo:
   rts
 
 ; Output a character (from the A register) to the serial interface.
@@ -115,6 +127,20 @@ INIT_BUFFER:
   sta WRITE_PTR
   rts
 
+; Return the number of unread bytes in the circular input buffer
+;
+; Modifies: flags, A
+BUFFER_SIZE:
+  lda WRITE_PTR
+  sec
+  sbc READ_PTR
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; INTERNAL SUBROUTINES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ; Write a character to the circular input buffer
 ;
 ; Reads: A
@@ -134,24 +160,19 @@ READ_BUFFER:
   inc READ_PTR
   rts
 
-; Return the number of unread bytes in the circular input buffer
-;
-; Modifies: flags, A
-BUFFER_SIZE:
-  lda WRITE_PTR
-  sec
-  sbc READ_PTR
+IRQ_HANDLER:
+  lda ACIA_SR
+  ; For now, assume the only source of interrupts is
+  ; incoming data from the UART
+  lda ACIA_DR
+  jsr WRITE_BUFFER
   rts
 
 ; Interrupt request handler (emulation mode)
 IRQ_HANDLER_E:
   pha
   phx
-  lda ACIA_SR
-  ; For now, assume the only source of interrupts is
-  ; incoming data from the UART
-  lda ACIA_DR
-  jsr WRITE_BUFFER
+  jsr IRQ_HANDLER
   plx
   pla
   rti
@@ -183,11 +204,7 @@ IRQ_HANDLER_N:
 .i8
   phk                 ; Program bank is $00 in an interrupt
   plb                 ; Data bank = $00
-  lda ACIA_SR
-  ; For now, assume the only source of interrupts is
-  ; incoming data from the UART
-  lda ACIA_DR
-  jsr WRITE_BUFFER
+  jsr IRQ_HANDLER
   rep #$30
 .a16
 .i16
@@ -339,7 +356,17 @@ CHRIN_L:
 CHROUT_L:
   LONG_CALL CHROUT
 
+INIT_BUFFER_L:
+  LONG_CALL INIT_BUFFER
+
+BUFFER_SIZE_L:
+  LONG_CALL BUFFER_SIZE
+
+.ifdef EATER
+.include "eater_wozmon.s"
+.else
 .include "wozmon.s"
+.endif
 
 .segment "RESETVEC"
                 ; Native mode

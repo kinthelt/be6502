@@ -16,6 +16,8 @@
 ;   21000: A9 00  store into $02:1000, $02:1001
 ;   21000R        run $02:1000 in emulation mode
 ;   21000N        run $02:1000 in native mode
+;   21000.2100F S save $02:1000-$02:100F to a file with XMODEM
+;   21000L        load a file with XMODEM into memory from $02:1000
 ;
 ; Examine and store run across bank boundaries ($01:FFFF -> $02:0000).
 ; Addresses are printed as six hex digits (BBHHLL), so they can be typed
@@ -34,6 +36,17 @@
 ; restores the data bank and direct page to $00/$0000, clears decimal
 ; mode, re-enables interrupts, and prompts for a new line. Interrupts stay enabled and are handled by the native-mode
 ; vectors in the BIOS.
+;
+; S and L, like R and N, act on what was just examined. S sends from the
+; store index (the first address typed, which is where examining
+; started) through the examine index (the last address examined), so a
+; block examine followed by S saves that block; a single address
+; followed by S saves one byte. L receives into memory starting at the
+; examine index. Start the matching XMODEM receive or send in the
+; terminal program after pressing Return; ESC aborts. XMODEM sends whole
+; 128-byte blocks, so S pads the file with zeros, and L writes the
+; padding at the end of the file into memory too. Wozmon prompts for a
+; new line when the transfer ends.
 
 XAML  = $24                            ; Last "opened" location Low
 XAMH  = $25                            ; Last "opened" location High
@@ -106,6 +119,10 @@ NEXTITEM:
                 BEQ     RUNPROG        ; Yes, run user program.
                 CMP     #$4E           ; "N"?
                 BEQ     RUNNATIVE      ; Yes, run user program in native mode.
+                CMP     #$53           ; "S"?
+                BEQ     TOSAVE         ; Yes, save memory with XMODEM.
+                CMP     #$4C           ; "L"?
+                BEQ     TOLOAD         ; Yes, load memory with XMODEM.
                 STX     L              ; $00 -> L.
                 STX     H              ;    and H.
                 STX     BK             ;    and BK.
@@ -151,6 +168,8 @@ NOTHEX:
                 BNE     TONEXTITEM     ; Get next item (no carry).
                 INC     STB            ; Add carry to 'store index' bank.
 TONEXTITEM:     JMP     NEXTITEM       ; Get next command item.
+TOSAVE:         JMP     SAVEPROG       ; Out of branch range from NEXTITEM.
+TOLOAD:         JMP     LOADPROG
 
 RUNPROG:
                 LDA     XAMB           ; Target outside bank $00?
@@ -244,3 +263,31 @@ PRHEX:
 ECHO:
                 JSR     CHROUT         ; From BIOS
                 RTS                    ; Return.
+
+SAVEPROG:
+                SEC                    ; Byte count = 'examine index' -
+                LDA     XAML           ;  'store index' + 1, into L, H, BK.
+                SBC     STL
+                STA     L
+                LDA     XAMH
+                SBC     STH
+                STA     H
+                LDA     XAMB
+                SBC     STB
+                STA     BK
+                BCS     SAVECOUNT      ; Examine index below store index?
+                JMP     ESCAPE         ; Yes, nothing to save.
+SAVECOUNT:      INC     L
+                BNE     SAVEXM
+                INC     H
+                BNE     SAVEXM
+                INC     BK
+SAVEXM:         LDA     #STL           ; Save from the 'store index'
+                LDX     #L             ;  for L, H, BK bytes.
+                JSR     XSAVE
+                JMP     GETLINE        ; Prompt for the next line.
+
+LOADPROG:
+                LDA     #XAML          ; Load at the 'examine index'.
+                JSR     XLOAD
+                JMP     GETLINE        ; Prompt for the next line.

@@ -50,39 +50,63 @@ TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
 .include "xmodem.s"
 .endif
 
-; Loads a file via XModem into memory
-; A register contains pointer to (low-order, high-order) location table.
+; Loads a file via XMODEM/CRC into memory.
+; Interrupts must be enabled, as CHRIN is fed by the IRQ handler.
+; A register contains the zero page address of a 3-byte (low-order,
+; high-order, bank) table holding the address to load the file at.
+; The whole file is written there, including the padding at the end of
+; its last 128-byte block.
+; On return, carry is set if the transfer succeeded, clear if it failed
+; or was cancelled.
 ;
 ; Modifies: flags
 XLOAD:
+  pha
   phx
   phy
-  pha
+  tax
+  lda 0,x
   sta ptr
-  inc
+  lda 1,x
   sta ptrh
+  lda 2,x
+  sta ptrb
   jsr XModemRcv
   ply
   plx
   pla
   rts
 
-; Saves a file via XModem from memory
-; A register contains pointer to (low-order, high-order) location table.
-; X register contains pointer to (low-order, high-order) length table
+; Saves memory to a file via XMODEM/CRC.
+; Interrupts must be enabled, as CHRIN is fed by the IRQ handler.
+; A register contains the zero page address of a 3-byte (low-order,
+; high-order, bank) table holding the address of the first byte to save.
+; X register contains the zero page address of a 3-byte (low-order,
+; high-order, bank) table holding the number of bytes to save.
+; The file is padded with zeros to a whole number of 128-byte blocks.
+; On return, carry is set if the transfer succeeded, clear if it failed
+; or was cancelled.
 ;
 ; Modifies: flags
 XSAVE:
+  pha
   phx
   phy
-  pha
+  lda 0,x
+  sta count
+  lda 1,x
+  sta counth
+  lda 2,x
+  sta countb
+  lda 3,s             ; Caller's A
+  tax
+  lda 0,x
   sta ptr
-  sta eofp,x
-  inc
-  inx
+  lda 1,x
   sta ptrh
-  sta eofph,x
-  jsr XModemRcv
+  lda 2,x
+  sta ptrb
+  jsr XModemSend
   ply
   plx
   pla

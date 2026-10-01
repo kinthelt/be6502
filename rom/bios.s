@@ -50,12 +50,42 @@ TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
 .include "xmodem.s"
 .endif
 
-; Dummy functions, to be completed later
-
+; Loads a file via XModem into memory
+; A register contains pointer to (low-order, high-order) location table.
+;
+; Modifies: flags
 XLOAD:
+  phx
+  phy
+  pha
+  sta ptr
+  inc
+  sta ptrh
+  jsr XModemRcv
+  ply
+  plx
+  pla
   rts
 
+; Saves a file via XModem from memory
+; A register contains pointer to (low-order, high-order) location table.
+; X register contains pointer to (low-order, high-order) length table
+;
+; Modifies: flags
 XSAVE:
+  phx
+  phy
+  pha
+  sta ptr
+  sta eofp,x
+  inc
+  inx
+  sta ptrh
+  sta eofph,x
+  jsr XModemRcv
+  ply
+  plx
+  pla
   rts
 
 ; Sets ACIA's control and command registers

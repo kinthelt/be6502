@@ -40,8 +40,9 @@ BANK_LAST   = $07
 
 PHI2_HZ     = 6000000
 ;PHI2_HZ     = 1000000
-BAUD        = 19200
-TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
+BAUD        = 115200
+;BAUD        = 19200
+TX_CYCLES = (PHI2_HZ * 10 / BAUD * 110 + 99) / 100
 ;TX_CYCLES = 3282
 
 .ifdef EATER

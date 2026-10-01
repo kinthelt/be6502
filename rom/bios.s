@@ -49,24 +49,8 @@ TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
 LOAD:
   rts
 
-LOAD_L:
-  phb
-  phk
-  plb
-  jsr LOAD
-  plb
-  rtl
-
 SAVE:
   rts
-
-SAVE_L:
-  phb
-  phk
-  plb
-  jsr SAVE
-  plb
-  rtl
 
 ; Sets ACIA's control and command registers
 ; No return value.
@@ -106,14 +90,6 @@ CHRIN:
   clc
   rts
 
-CHRIN_L:
-  phb
-  phk
-  plb
-  jsr CHRIN
-  plb
-  rtl
-
 ; Output a character (from the A register) to the serial interface.
 ;
 ; Modifies: flags
@@ -130,14 +106,6 @@ CHROUT:
   beq @tx_wait
   pla
   rts
-
-CHROUT_L:
-  phb
-  phk
-  plb
-  jsr CHROUT
-  plb
-  rtl
 
 ; Initialize the read buffer
 ;
@@ -235,6 +203,141 @@ IRQ_HANDLER_N:
 ; NMI, BRK, COP and ABORT handler (native mode)
 NMI_HANDLER_N:
   rti
+
+; Long-call wrapper for a 6502-style BIOS routine.
+;
+; The routine is written for the 65C02: it expects 8-bit registers, the
+; direct page at $0000, the data bank at $00, binary (not decimal)
+; arithmetic, and to be called with JSR from bank $00. The wrapper lets
+; a program call it with JSL instead, from emulation or native mode,
+; with any register sizes, from any bank, and with any data bank or
+; direct page. The program gets back exactly the state it called with,
+; except for:
+;
+;   - the accumulator, which is passed to the routine and returned from
+;     it unchanged by the wrapper. Only the low byte reaches the
+;     routine. A native program using a 16-bit accumulator gets back its
+;     own high byte with the routine's result in the low byte.
+;   - the carry flag, which is the routine's carry result.
+;
+; Everything else, including the interrupt-disable and decimal flags,
+; is put back the way the caller had it.
+;
+; The routine does not see the caller's carry flag, so it cannot take
+; carry as an input. If it does not set carry itself, the carry handed
+; back is meaningless (it is whatever the mode switch left there).
+;
+; The wrapper keeps two copies of the flags on the stack. The first is
+; the caller's flags as they were; the routine's carry result is copied
+; into it, and it is the last thing restored. The second is pushed
+; after the carry flag has been exchanged with the emulation flag, so
+; its carry records whether the caller was in emulation mode, and in
+; native mode it also records the caller's register sizes. One byte
+; cannot do both jobs: on the way out, carry has to hold the mode going
+; into the second exchange, and comes out of it holding something else.
+; The routine's carry result therefore has to be restored afterwards,
+; from its own byte.
+;
+; Stack while the routine runs, newest first, below the caller's
+; return address:
+;
+;   return address into the wrapper (2 bytes, pushed by JSR)
+;   caller's direct page location (2 bytes)
+;   caller's data bank (1 byte)
+;   caller's Y index register (2 bytes)
+;   caller's X index register (2 bytes)
+;   mode byte: flags with the caller's mode in the carry bit
+;   caller's flags, which will receive the routine's carry result
+;
+; Index registers are always saved at full 16-bit width. If the caller
+; used 8-bit index registers their high bytes are zero, so restoring
+; the full width changes nothing.
+;
+; The wrapper must sit in bank $00, because JSR only reaches routines
+; in the bank the wrapper itself is running in.
+;
+; A caller in emulation mode has its stack in $0100-$01FF. In native
+; mode the stack is no longer held to that page, so if it runs past
+; $0100 it spills into the direct page instead of wrapping around. Such
+; a caller needs 11 free bytes of stack for the wrapper, plus whatever
+; the routine itself pushes.
+.macro LONG_CALL target
+  .local caller_carry_done
+
+  ; Save the caller's mode and switch to native mode.
+  php                 ; Caller's flags
+  clc
+  xce                 ; Native mode; carry now holds the old emulation flag
+  php                 ; Mode byte (also holds the caller's register sizes)
+
+  ; Save the caller's registers.
+  rep #$10            ; 16-bit index registers, so both bytes are saved
+.i16
+  phx
+  phy
+  phb                 ; Caller's data bank
+  phd                 ; Caller's direct page
+
+  ; Set up the environment a 6502-style routine expects.
+  pea $0000
+  pld                 ; Direct page at $0000
+  sep #$30            ; 8-bit accumulator and index registers
+.a8
+.i8
+  cld                 ; Binary arithmetic
+  phk                 ; The wrapper runs in bank $00...
+  plb                 ; ...so this sets the data bank to $00
+
+  jsr target
+
+  ; Copy the routine's carry result into the caller's saved flags,
+  ; which are now 10 bytes up the stack once the accumulator is pushed.
+  ; Loading, masking and storing below do not change the carry flag.
+  pha                 ; Keep the routine's accumulator result
+  lda 10,s            ; Caller's saved flags
+  and #$FE            ; Clear the saved carry
+  bcc caller_carry_done
+  ora #$01            ; The routine returned carry set
+caller_carry_done:
+  sta 10,s
+  pla                 ; Routine's accumulator result
+
+  ; Restore the caller's registers, at full 16-bit width.
+  rep #$10
+.i16
+  pld                 ; Caller's direct page
+  plb                 ; Caller's data bank
+  ply
+  plx
+
+  ; Restore the caller's mode, then its flags.
+  plp                 ; Mode byte: register sizes, and the mode in carry
+  xce                 ; Back to the caller's mode
+  plp                 ; Caller's flags, carrying the routine's carry result
+  rtl
+.a8
+.i8
+.endmacro
+
+; Long-call entry points for programs in any bank or mode.
+; Call with JSL. See LONG_CALL above for what is preserved.
+;
+; ACIA_SETUP has no entry point here on purpose. It enables interrupts
+; as its last step, and the wrapper would put back the caller's
+; interrupt-disable flag on the way out, undoing that.
+.segment "BIOS_L"
+
+LOAD_L:
+  LONG_CALL LOAD
+
+SAVE_L:
+  LONG_CALL SAVE
+
+CHRIN_L:
+  LONG_CALL CHRIN
+
+CHROUT_L:
+  LONG_CALL CHROUT
 
 .include "wozmon.s"
 

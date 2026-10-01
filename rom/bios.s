@@ -81,6 +81,14 @@ CHRIN:
   jsr BUFFER_SIZE
   beq @no_keypressed
   jsr READ_BUFFER
+  pha
+  jsr BUFFER_SIZE
+  cmp #$B0 ; Buffer is at most 2/3 full
+  bcs @mostly_full
+  lda #$09
+  sta ACIA_CMDR
+@mostly_full:
+  pla
   plx
   sec
   rts
@@ -166,6 +174,12 @@ IRQ_HANDLER:
   ; incoming data from the UART
   lda ACIA_DR
   jsr WRITE_BUFFER
+  jsr BUFFER_SIZE
+  cmp #$EF ; Check if buffer is almost full
+  bcc @not_full
+  lda #$01
+  sta ACIA_CMDR
+@not_full:
   rts
 
 ; Interrupt request handler (emulation mode)

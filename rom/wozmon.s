@@ -16,6 +16,8 @@
 ;   21000: A9 00  store into $02:1000, $02:1001
 ;   21000R        run $02:1000 in emulation mode
 ;   21000N        run $02:1000 in native mode
+;   21000.2100F S save $02:1000-$02:100F to a file with XMODEM
+;   21000L        load a file with XMODEM into memory from $02:1000
 ;
 ; Examine and store run across bank boundaries ($01:FFFF -> $02:0000).
 ; Addresses are printed as six hex digits (BBHHLL), so they can be typed
@@ -34,6 +36,20 @@
 ; restores the data bank and direct page to $00/$0000, clears decimal
 ; mode, re-enables interrupts, and prompts for a new line. Interrupts stay enabled and are handled by the native-mode
 ; vectors in the BIOS.
+;
+; S and L, like R and N, act on what was just examined. S sends from the
+; store index (the first address typed, which is where examining
+; started) through the examine index (the last address examined), so a
+; block examine followed by S saves that block; a single address
+; followed by S saves one byte. L receives into memory starting at the
+; examine index. Start the matching XMODEM receive or send in the
+; terminal program after pressing Return; ESC aborts. XMODEM sends whole
+; 128-byte blocks, so S pads the file with zeros, and L writes the
+; padding at the end of the file into memory too. Wozmon prompts for a
+; new line when the transfer ends.
+;
+; Examining prints nothing on a line that contains S, so the range to be
+; saved is not dumped to the terminal first.
 
 XAML  = $24                            ; Last "opened" location Low
 XAMH  = $25                            ; Last "opened" location High
@@ -46,6 +62,7 @@ H     = $2B                            ; Hex value parsing High
 BK    = $2C                            ; Hex value parsing Bank
 YSAV  = $2D                            ; Used to see if hex value is given
 MODE  = $2E                            ; $00=XAM, $7F=STOR, $AE=BLOCK XAM
+QUIET = $2F                            ; B7=1: line has an S, examine silently
 
 IN    = $0200                          ; Input buffer
 
@@ -83,6 +100,17 @@ NEXTCHAR:
                 CMP     #$0D           ; CR?
                 BNE     NOTCR          ; No.
 
+                LDX     #$00           ; Look for an "S" in the line.
+                LDY     #$FF
+SCANSAVE:       INY
+                LDA     IN,Y
+                CMP     #$53           ; "S"?
+                BNE     SCANCR
+                DEX                    ; Yes, B7 of X set ($FF and down).
+SCANCR:         CMP     #$0D           ; Up to the CR.
+                BNE     SCANSAVE
+                STX     QUIET          ; Examine quietly if an S was found.
+
                 LDY     #$FF           ; Reset text index.
                 LDA     #$00           ; For XAM mode.
                 TAX                    ; X=0.
@@ -106,6 +134,10 @@ NEXTITEM:
                 BEQ     RUNPROG        ; Yes, run user program.
                 CMP     #$4E           ; "N"?
                 BEQ     RUNNATIVE      ; Yes, run user program in native mode.
+                CMP     #$53           ; "S"?
+                BEQ     TOSAVE         ; Yes, save memory with XMODEM.
+                CMP     #$4C           ; "L"?
+                BEQ     TOLOAD         ; Yes, load memory with XMODEM.
                 STX     L              ; $00 -> L.
                 STX     H              ;    and H.
                 STX     BK             ;    and BK.
@@ -138,7 +170,9 @@ HEXSHIFT:
 
 NOTHEX:
                 CPY     YSAV           ; Check if L, H, BK empty (no hex digits).
-                BEQ     ESCAPE         ; Yes, generate ESC sequence.
+                BNE     GOTHEX
+                JMP     ESCAPE         ; Yes, generate ESC sequence.
+GOTHEX:
 
                 BIT     MODE           ; Test MODE byte.
                 BVC     NOTSTOR        ; B6=0 is STOR, 1 is XAM and BLOCK XAM.
@@ -151,6 +185,8 @@ NOTHEX:
                 BNE     TONEXTITEM     ; Get next item (no carry).
                 INC     STB            ; Add carry to 'store index' bank.
 TONEXTITEM:     JMP     NEXTITEM       ; Get next command item.
+TOSAVE:         JMP     SAVEPROG       ; Out of branch range from NEXTITEM.
+TOLOAD:         JMP     LOADPROG
 
 RUNPROG:
                 LDA     XAMB           ; Target outside bank $00?
@@ -184,6 +220,8 @@ SETADR:         LDA     L-1,X          ; Copy hex data to
                 STA     XAML-1,X       ; And to 'XAM index'.
                 DEX                    ; Next of 3 bytes.
                 BNE     SETADR         ; Loop unless X = 0.
+                BIT     QUIET          ; Examining quietly?
+                BMI     XAMNEXT        ; Yes, print nothing. (No: Z stays 1.)
 
 NXTPRNT:
                 BNE     PRDATA         ; NE means no address to print.
@@ -221,6 +259,8 @@ XAMNEXT:        STX     MODE           ; 0 -> MODE (XAM mode).
                 INC     XAMB
 
 MOD8CHK:
+                BIT     QUIET          ; Examining quietly?
+                BMI     XAMNEXT        ; Yes, print nothing.
                 LDA     XAML           ; Check low-order 'examine index' byte
                 AND     #$07           ; For MOD 8 = 0
                 BPL     NXTPRNT        ; Always taken.
@@ -244,3 +284,31 @@ PRHEX:
 ECHO:
                 JSR     CHROUT         ; From BIOS
                 RTS                    ; Return.
+
+SAVEPROG:
+                SEC                    ; Byte count = 'examine index' -
+                LDA     XAML           ;  'store index' + 1, into L, H, BK.
+                SBC     STL
+                STA     L
+                LDA     XAMH
+                SBC     STH
+                STA     H
+                LDA     XAMB
+                SBC     STB
+                STA     BK
+                BCS     SAVECOUNT      ; Examine index below store index?
+                JMP     ESCAPE         ; Yes, nothing to save.
+SAVECOUNT:      INC     L
+                BNE     SAVEXM
+                INC     H
+                BNE     SAVEXM
+                INC     BK
+SAVEXM:         LDA     #STL           ; Save from the 'store index'
+                LDX     #L             ;  for L, H, BK bytes.
+                JSR     XSAVE
+                JMP     GETLINE        ; Prompt for the next line.
+
+LOADPROG:
+                LDA     #XAML          ; Load at the 'examine index'.
+                JSR     XLOAD
+                JMP     GETLINE        ; Prompt for the next line.

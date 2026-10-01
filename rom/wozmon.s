@@ -47,6 +47,9 @@
 ; 128-byte blocks, so S pads the file with zeros, and L writes the
 ; padding at the end of the file into memory too. Wozmon prompts for a
 ; new line when the transfer ends.
+;
+; Examining prints nothing on a line that contains S, so the range to be
+; saved is not dumped to the terminal first.
 
 XAML  = $24                            ; Last "opened" location Low
 XAMH  = $25                            ; Last "opened" location High
@@ -59,6 +62,7 @@ H     = $2B                            ; Hex value parsing High
 BK    = $2C                            ; Hex value parsing Bank
 YSAV  = $2D                            ; Used to see if hex value is given
 MODE  = $2E                            ; $00=XAM, $7F=STOR, $AE=BLOCK XAM
+QUIET = $2F                            ; B7=1: line has an S, examine silently
 
 IN    = $0200                          ; Input buffer
 
@@ -95,6 +99,17 @@ NEXTCHAR:
                 STA     IN,Y           ; Add to text buffer.
                 CMP     #$0D           ; CR?
                 BNE     NOTCR          ; No.
+
+                LDX     #$00           ; Look for an "S" in the line.
+                LDY     #$FF
+SCANSAVE:       INY
+                LDA     IN,Y
+                CMP     #$53           ; "S"?
+                BNE     SCANCR
+                DEX                    ; Yes, B7 of X set ($FF and down).
+SCANCR:         CMP     #$0D           ; Up to the CR.
+                BNE     SCANSAVE
+                STX     QUIET          ; Examine quietly if an S was found.
 
                 LDY     #$FF           ; Reset text index.
                 LDA     #$00           ; For XAM mode.
@@ -155,7 +170,9 @@ HEXSHIFT:
 
 NOTHEX:
                 CPY     YSAV           ; Check if L, H, BK empty (no hex digits).
-                BEQ     ESCAPE         ; Yes, generate ESC sequence.
+                BNE     GOTHEX
+                JMP     ESCAPE         ; Yes, generate ESC sequence.
+GOTHEX:
 
                 BIT     MODE           ; Test MODE byte.
                 BVC     NOTSTOR        ; B6=0 is STOR, 1 is XAM and BLOCK XAM.
@@ -203,6 +220,8 @@ SETADR:         LDA     L-1,X          ; Copy hex data to
                 STA     XAML-1,X       ; And to 'XAM index'.
                 DEX                    ; Next of 3 bytes.
                 BNE     SETADR         ; Loop unless X = 0.
+                BIT     QUIET          ; Examining quietly?
+                BMI     XAMNEXT        ; Yes, print nothing. (No: Z stays 1.)
 
 NXTPRNT:
                 BNE     PRDATA         ; NE means no address to print.
@@ -240,6 +259,8 @@ XAMNEXT:        STX     MODE           ; 0 -> MODE (XAM mode).
                 INC     XAMB
 
 MOD8CHK:
+                BIT     QUIET          ; Examining quietly?
+                BMI     XAMNEXT        ; Yes, print nothing.
                 LDA     XAML           ; Check low-order 'examine index' byte
                 AND     #$07           ; For MOD 8 = 0
                 BPL     NXTPRNT        ; Always taken.

@@ -44,12 +44,18 @@ BAUD        = 19200
 TX_CYCLES = (PHI2_HZ * 10 / BAUD * 105 + 99) / 100
 ;TX_CYCLES = 3282
 
+.ifdef EATER
+.include "eater_xmodem.s"
+.else
+.include "xmodem.s"
+.endif
+
 ; Dummy functions, to be completed later
 
-LOAD:
+XLOAD:
   rts
 
-SAVE:
+XSAVE:
   rts
 
 ; Sets ACIA's control and command registers
@@ -358,11 +364,11 @@ caller_carry_done:
 ; interrupt-disable flag on the way out, undoing that.
 .segment "BIOS_L"
 
-LOAD_L:
-  LONG_CALL LOAD
+XLOAD_L:
+  LONG_CALL XLOAD
 
-SAVE_L:
-  LONG_CALL SAVE
+XSAVE_L:
+  LONG_CALL XSAVE
 
 CHRIN_L:
   LONG_CALL CHRIN

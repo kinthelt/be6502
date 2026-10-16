@@ -1,27 +1,25 @@
 # KiCad schematic
 
-Schematic for the W65C816S breadboard computer, drawn from `../README.md` and
-`../pld/decode.pld` (816DEC02). Open `be6502.kicad_pro` in KiCad 7 or newer.
-`be6502.pdf` is a plot of all sheets.
+Schematic for the W65C816S breadboard computer, as built. Open
+`be6502.kicad_pro` in KiCad 7 or newer. `be6502.pdf` is a plot of all sheets.
 
 ## Sheets
 
 | Sheet | Contents |
 |-------|----------|
 | `be6502.kicad_sch` | Root: sheet index, memory map |
-| `cpu.kicad_sch` | U1 W65C816S, U2 74HC573 bank latch, U3 ATF22V10C (816DEC02), X1 clock, reset, pull-ups |
-| `memory.kicad_sch` | U4 AT28C256 ROM, U5 AS6C4008 RAM, U6 62256 video RAM |
-| `io.kicad_sch` | U7 74HC138 slot decoder, U8 W65C22 VIA, U9 W65C51N ACIA, port and serial headers |
-| `power.kicad_sch` | +5 V input, power flags, bulk capacitor |
+| `cpu.kicad_sch` | U1 W65C816S, U2 74HC573 bank latch, U3 ATF22V10C (816DEC02), X1 12 MHz oscillator, reset |
+| `memory.kicad_sch` | U4 AT28C256 ROM, U5 AS6C4008 RAM |
+| `io.kicad_sch` | U6 74HC138, U7 W65C22N VIA with Port B LEDs, U8 W65C51N ACIA, X2 1.8432 MHz oscillator, U9 MAX232N, J2 DB9 |
+| `power.kicad_sch` | J1 bench supply, C1 |
 
 Sheets connect through global labels.
 
 ## Signal names
 
 Active-low signals use KiCad's overbar notation in both net labels and pin
-names: `~{IOSEL}`, `~{ROMCE}`, `~{RAMCE}`, `~{VRAMCE}`, `~{OEGATE}`,
-`~{WEGATE}`, `~{RES}`, `~{IRQ}`, `R/~{W}`, and so on. Here is how they map to
-the names used elsewhere:
+names: `~{IOSEL}`, `~{ROMCE}`, `~{RAMCE}`, `~{OEGATE}`, `~{WEGATE}`, `~{RES}`,
+`~{IRQ}`, `R/~{W}`, and so on.
 
 | Schematic | decode.pld | WDC datasheet |
 |-----------|------------|---------------|
@@ -38,40 +36,65 @@ KiCad stores `/` in a net name as `{slash}`, so the read/write net is
 The project library `be6502.kicad_sym` contains every symbol the schematic
 uses. The W65C816S, W65C22, W65C51N and the programmed ATF22V10C are drawn
 from the WDC and Microchip pinouts. The other parts are copied from the stock
-KiCad libraries, and pins like `OE`, `Load`, `CE#` are renamed to `~{OE}`,
-`LE`, `~{CE}`.
+KiCad libraries, with pins such as `OE`, `Load` and `CE#` renamed to `~{OE}`,
+`LE` and `~{CE}`.
 
-## Taken from README.md / decode.pld
+## Wiring
 
-- GAL pin assignment exactly as in the `PIN ASSIGNMENT` section of decode.pld.
-- 74HC573 `~{OE}` tied to GND, LE from GAL pin 14. Q0–Q2 drive A16–A18, Q7 drives A23,
-  and Q3–Q6 (A19–A22) are left unconnected.
-- `~{OEGATE}` and `~{WEGATE}` are shared by the ROM, RAM and video RAM. The ROM's `~{WE}` is tied high.
-- 74HC138: A/B/C = A10/A11/A12, `~{E0}` (pin 4) = `~{IOSEL}`, `~{E1}` (pin 5) = GND
-  (reserved PHI2 hook), E2 (pin 6) = VCC. Y0 goes to the VIA `~{CS2}`, Y4 to the ACIA `~{CS1}`,
-  and the other outputs are left open.
-- VIA: CS1 = VCC, RS0–RS3 = A0–A3. ACIA: CS0 = VCC, RS0–RS1 = A0–A1.
-- The VIA IRQ goes through a Schottky diode into the shared `~{IRQ}` line, which has a pull-up
-  (README: works with both the W65C22S and the W65C22N).
+**CPU (U1)**
+- `~{ABORT}`, BE, RDY and `~{NMI}` are tied directly to +5V.
+- VDA, VPA, `~{VP}`, `~{ML}`, E and MX are not connected.
+- `~{RES}` has a pull-up (R1) and a push button (SW1) to GND.
+- `~{IRQ}` has a pull-up (R2). It is shared by the VIA and the ACIA, both open drain, with no diode.
 
-## Assumptions (not specified in README.md or decode.pld)
+**Clock**
+- X1 is a 12 MHz DIP-14 oscillator driving GAL pin 1 (CLK2). The GAL divides it to PHI2 = 6 MHz.
+- X1 pin 1 is not connected.
 
-Check these against the breadboard:
+**Bank latch and decode (U2, U3)**
+- The GAL pins are exactly as in the `PIN ASSIGNMENT` section of `pld/decode.pld`.
+- `~{VRAMCE}` (GAL pin 17) is not connected, because the video RAM is future expansion.
+- GAL pins 11, 13, 15 and 16 are spare.
+- On the 74HC573, `~{OE}` goes to GND and LE comes from GAL pin 14.
+- Q0–Q2 drive A16–A18 and Q7 drives A23. Q3–Q6 are not connected.
 
-- X1 is a 12 MHz DIP-14 oscillator can, so PHI2 = 6 MHz (`PHI2_HZ` in `rom/bios.s`).
-- Reset is a 10k pull-up plus a push button. RDY, `~{IRQ}` and `~{NMI}` have 3.3k pull-ups.
-  `~{ABORT}` and BE are tied to VCC. VDA, VPA, `~{VP}`, `~{ML}`, E and MX are not connected.
-- ACIA: a 1.8432 MHz crystal sits directly across XTLI/XTLO. `~{CTS}`, `~{DSR}` and `~{DCD}`
-  are tied low, and `~{DTR}` and RxC are not connected.
-- J4 is an FTDI-style 6-pin TTL serial header (1 GND, 2 CTS#, 3 VCC n/c, 4 TXD, 5 RXD,
-  6 RTS# n/c). ACIA `~{RTS}` goes to the adapter's CTS# for the flow control in `bios.s`.
-- The VIA ports go to two 1x10 headers (J2: PA0–7, CA1, CA2; J3: PB0–7, CB1, CB2).
-- There is one 100 nF decoupling capacitor per package, plus a 10 µF bulk capacitor at J1.
-- Footprints are DIP and through-hole parts, set for reference only.
+**Memory (U4, U5)**
+- The ROM and RAM share `~{OEGATE}`.
+- `~{WEGATE}` goes only to the RAM's `~{WE}`. The ROM's `~{WE}` is tied high.
+
+**I/O decoder (U6, 74HC138)**
+- A/B/C = A10/A11/A12.
+- `~{E0}` = `~{IOSEL}`, `~{E1}` = GND, E2 = +5V.
+- Y0 goes to the VIA's `~{CS2}` and Y4 to the ACIA's `~{CS1}`. The other outputs are not connected.
+
+**VIA (U7, W65C22N6TPG-14)**
+- CS1 = +5V, RS0–RS3 = A0–A3.
+- Port A, CA1, CA2, CB1 and CB2 are not connected.
+- Each PBn drives an LED (D1–D8) and a resistor (R3–R10) to GND: PBn → LED → resistor → GND.
+
+**ACIA (U8)**
+- CS0 = +5V, RS0–RS1 = A0–A1.
+- X2 is a 1.8432 MHz DIP-8 oscillator driving XTLI. X2 pin 1 (EN) is tied to +5V.
+- XTLO, RxC and `~{DTR}` are not connected. `~{CTS}`, `~{DSR}` and `~{DCD}` are tied to GND.
+
+**RS-232 (U9 MAX232N, J2 DB9 female)**
+- ACIA TxD → T1IN → T1OUT → DB9 pin 2.
+- DB9 pin 3 → R1IN → R1OUT → ACIA RxD.
+- ACIA `~{RTS}` → T2IN → T2OUT → DB9 pin 8.
+- DB9 pin 5 = GND. The other DB9 pins are not connected.
+- R2IN and R2OUT are not connected.
+- The charge-pump capacitors are 1 µF electrolytics: C2 across C1+/C1−, C3 across C2+/C2−, C4 from VS+ to GND, C5 from VS− to GND.
+
+**Power**
+- J1 represents the leads from the +5V bench supply.
+- C1 (0.1 µF electrolytic) across +5V and GND at the supply connection is the only decoupling capacitor.
+
+**Unknown values**
+- The values of R1–R10 are unknown, so they are shown as `?`.
 
 ## Verification
 
 The project was generated with KiCad 7.0 and checked with `kicad-cli sch
-export netlist`. Every net matches the connections listed above, and the only
-unconnected pins are the ones marked no-connect. ERC has not been run, because
+export netlist`. Every net matches the wiring above, and the only unconnected
+pins are the ones marked no-connect. ERC has not been run, because
 `kicad-cli` 7 has no ERC command. Run it in the GUI.

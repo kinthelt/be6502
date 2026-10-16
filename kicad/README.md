@@ -81,7 +81,7 @@ KiCad libraries, with pins such as `OE`, `Load` and `CE#` renamed to `~{OE}`,
 - ACIA TxD → T1IN → T1OUT → DB9 pin 2.
 - DB9 pin 3 → R1IN → R1OUT → ACIA RxD.
 - ACIA `~{RTS}` → T2IN → T2OUT → DB9 pin 8.
-- DB9 pin 5 = GND. The other DB9 pins are not connected.
+- DB9 pin 5 = GND. DB9 pins 1, 4, 6, 7 and 9 are not connected.
 - R2IN and R2OUT are not connected.
 - The charge-pump capacitors are 1 µF electrolytics: C2 across C1+/C1−, C3 across C2+/C2−, C4 from VS+ to GND, C5 from VS− to GND.
 
@@ -89,8 +89,8 @@ KiCad libraries, with pins such as `OE`, `Load` and `CE#` renamed to `~{OE}`,
 - J1 represents the leads from the +5V bench supply.
 - C1 (0.1 µF electrolytic) across +5V and GND at the supply connection is the only decoupling capacitor.
 
-**Unknown values**
-- The values of R1–R10 are unknown, so they are shown as `?`.
+**Resistor values**
+- R1–R10 are shown as 1k. This is an estimate, because the markings can't be read.
 
 ## Verification
 

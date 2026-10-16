@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "filename": "be6502.kicad_pro",
+    "version": 1
+  },
+  "schematic": {
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "sheets": [
+    [
+      "c8451a90-6bbf-595d-a4c9-ea2cdd0996a1",
+      ""
+    ],
+    [
+      "f67db34f-3d17-54e5-a1b6-ae57793ddc10",
+      "CPU and decode"
+    ],
+    [
+      "9143e839-df6e-52bf-a121-3a9a8f1625cb",
+      "Memory"
+    ],
+    [
+      "b62cf215-31ca-5406-b0ac-3a24a3937287",
+      "I/O"
+    ],
+    [
+      "b455a6f5-8f62-5a1c-b7d1-ce7f0c9edb4a",
+      "Power"
+    ]
+  ],
+  "boards": [],
+  "libraries": {
+    "pinned_footprint_libs": [],
+    "pinned_symbol_libs": []
+  },
+  "text_variables": {}
+}

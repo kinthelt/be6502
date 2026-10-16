@@ -15,6 +15,11 @@ The bank byte allows up to 255 banks of 64k each.  A whopping 16MB of address sp
 
 With the addition of multiple banks, I won't be able to use a single 7400 to decode addresses without significant shadowing.  So the plan is to use an ATF22V10C programmable logic device to decode addresses.  The PLD allows me to remove some of the "wasted" space in Ben Eater's design.
 
+## Schematic
+
+The KiCad schematic is in [`kicad/`](kicad/), and [`kicad/be6502.pdf`](kicad/be6502.pdf)
+is a plot of it. See [`kicad/README.md`](kicad/README.md).
+
 ## The Ben Eater Address Space
 
 | Range           | Size    | Device                          | Notes                                      |
@@ -54,8 +59,11 @@ With the addition of multiple banks, I won't be able to use a single 7400 to dec
 | `$00:0000`–`$00:FFFF` | 64 KB  | Bank 0 — RAM, I/O, ROM (see below)        |
 | `$01:0000`–`$07:FFFF` | 448 KB | RAM, full banks                           |
 | `$08:0000`–`$7F:FFFF` | —      | Aliases of banks `$00`–`$07`              |
-| `$80:0000`–`$80:7FFF` | 32 KB  | Video RAM (62256)                         |
+| `$80:0000`–`$80:7FFF` | 32 KB  | Video RAM (62256), future, not fitted     |
 | `$80:8000`–`$FF:FFFF` | —      | Aliases of `$80:0000`–`$80:7FFF`          |
+
+The GAL already decodes `/VRAMCE` for the video bank, but no video RAM is fitted yet.
+GAL pin 17 is unconnected.
 
 RAM total: 472 KB reachable of 512 KB installed (AS6C4008). The 40 KB shortfall is
 bank 0's I/O window and ROM window shadowing the SRAM.
@@ -139,7 +147,10 @@ enabled by IOSEL from the ATF22V10C (816DEC01).
 | 15 | Y0 | $6000 — VIA CS2B |
 | 16 | VCC | +5V |
 
-100 nF from pin 16 to pin 8, close to the package.
+100 nF from pin 16 to pin 8, close to the package, is the usual
+recommendation. This build has no per-chip decoupling (no room). The
+only decoupling capacitor is a 0.1 µF electrolytic across +5V and GND
+at the bench supply connection.
 
 ### Output behaviour
 
@@ -243,6 +254,10 @@ fight.
 
 With the ACIA on the same node, this decides the interrupt topology
 for the whole system. Settle it before wiring either chip.
+
+This build uses a **W65C22N6TPG-14** (open drain). Its IRQB is wired
+directly to the shared IRQB line with the ACIA, with a single pull-up
+and no diode.
 
 ### Processor interface timing — 5 V, 14 MHz
 

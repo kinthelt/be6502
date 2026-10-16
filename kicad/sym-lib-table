@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "be6502")(type "KiCad")(uri "${KIPRJMOD}/be6502.kicad_sym")(options "")(descr "be6502 project symbols"))
+)

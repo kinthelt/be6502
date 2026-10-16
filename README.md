@@ -20,6 +20,11 @@ With the addition of multiple banks, I won't be able to use a single 7400 to dec
 The KiCad schematic is in [`kicad/`](kicad/), and [`kicad/be6502.pdf`](kicad/be6502.pdf)
 is a plot of it. See [`kicad/README.md`](kicad/README.md).
 
+The schematic is now rev 2, the design for a PCB. It adds decoupling, a USB-C
+and bench power input, expansion and VIA headers, and debugging aids, and it
+uses the 816DEC03 GAL equations in [`pld/decode03.pld`](pld/decode03.pld).
+The breadboard as wired (rev 1, 816DEC02) is at commit `2bfb76a`.
+
 ## The Ben Eater Address Space
 
 | Range           | Size    | Device                          | Notes                                      |
@@ -110,6 +115,8 @@ Both sets are in ROM. ROM is fixed at `$00:8000` — no vector remap or bank swi
 Bank byte A16–A23 is captured from D0–D7 by a 74HC573, LE driven by `/PHI2`.
 
 GAL (ATF22V10C) inputs: A12–A15, A16–A18, A23, PHI2, RWB.
+On the PCB (816DEC03), VDA and VPA are inputs too, and `/IOSEL` requires
+VDA + VPA. See NOTE 9 in `pld/decode03.pld`.
 A19–A22 are deliberately left as don't-cares — hence the aliasing above. Tighten
 this first if a second RAM or VRAM device is ever added.
 

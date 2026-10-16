@@ -27,6 +27,10 @@
     [
       "b455a6f5-8f62-5a1c-b7d1-ce7f0c9edb4a",
       "Power"
+    ],
+    [
+      "55b79aa4-89f4-5549-b0fa-20da30c1af54",
+      "Expansion and debug"
     ]
   ],
   "boards": [],

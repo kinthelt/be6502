@@ -90,7 +90,7 @@ KiCad libraries, with pins such as `OE`, `Load` and `CE#` renamed to `~{OE}`,
 - C1 (0.1 µF electrolytic) across +5V and GND at the supply connection is the only decoupling capacitor.
 
 **Resistor values**
-- R1–R10 are shown as 1k. This is an estimate, because the markings can't be read.
+- R1–R10 are 1k, measured with a multimeter.
 
 ## Verification
 

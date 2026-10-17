@@ -25,6 +25,9 @@ and bench power input, expansion and VIA headers, and debugging aids, and it
 uses the 816DEC03 GAL equations in [`pld/decode03.pld`](pld/decode03.pld).
 The breadboard as wired (rev 1, 816DEC02) is at commit `2bfb76a`.
 
+The 4-layer board, `kicad/be6502.kicad_pcb`, has its parts placed and is
+ready to route. See the PCB section of [`kicad/README.md`](kicad/README.md#pcb).
+
 ## The Ben Eater Address Space
 
 | Range           | Size    | Device                          | Notes                                      |

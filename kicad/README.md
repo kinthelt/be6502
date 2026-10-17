@@ -9,8 +9,8 @@ Rev 1 documented the breadboard as wired. It is at commit `2bfb76a` (`git show
 and adds what a board needs: decoupling, a proper power input, sockets,
 expansion headers, debugging aids, and VDA/VPA qualification of the I/O select.
 
-No PCB layout exists yet. The planned board is 4 layers
-(signal / GND / +5V / signal).
+`be6502.kicad_pcb` is the board: parts placed, not yet routed. See
+[PCB](#pcb) below.
 
 ## Sheets
 
@@ -200,3 +200,81 @@ pull-up, so it shares `~{RES}` with SW1 and J3. Any low on the line, a button
 press for example, is stretched into a full, debounced reset. R1 (10k) only
 keeps `~{RES}` defined if U11 is left out. The -5 part trips nearer 5 V than
 the DS1813-10 (4.35 V). If a weak USB supply causes spurious resets, fit the -10.
+
+## PCB
+
+![Placement](placement.png)
+
+`be6502.kicad_pcb` is 190 x 120 mm with four layers:
+
+| Layer | Use |
+|-------|-----|
+| F.Cu | Signals |
+| In1.Cu | Solid GND plane |
+| In2.Cu | Solid +5V plane |
+| B.Cu | Signals |
+
+Every footprint is placed and carries its nets, and each is linked to its
+schematic symbol, so **Tools → Update PCB from Schematic** (F8) updates parts
+in place instead of adding duplicates. Nothing is routed yet.
+
+### Placement
+
+- **Left edge:** J3 expansion header, with the CPU next to it.
+- **Top edge:** power input (USB-C J6, bench terminal J1, JP4, SW2), then
+  F1, Q1, C1 and the power LED, then the reset button SW1 and U11.
+- **Middle row:** U2 latch over U3 GAL, U4 ROM, U5 RAM, U6 '138, U7 VIA,
+  U8 ACIA, U9 MAX232.
+- **Right edge:** J4 VIA header and the DB9, J2. The DB9's front sits at
+  the board edge, 7.7 mm from its pins.
+- **Below the GAL:** X1 and the clock jumpers.
+- **Below the ROM:** U10, the PHI2 buffer, with JP2.
+- **Bottom:** the Port B LEDs and resistors, JP3, and the test points.
+- **Decoupling:** a 100 nF capacitor sits at the top end of each IC.
+- **Mounting holes:** M3, 4 mm in from each corner.
+- **U4 (ROM):** has room above it for a ZIF socket lever.
+
+### Design rules
+
+The project file defines two net classes.
+
+| Class | Track | Via | Nets |
+|-------|-------|-----|------|
+| Default | 0.25 mm | 0.6 / 0.3 mm | All signals |
+| Power | 0.6 mm | 0.8 / 0.4 mm | VCC, GND, VBUS, VBENCH, the power path through JP4, SW2, F1 and Q1 |
+
+Clearance is 0.2 mm for both. The board is comfortably within standard
+4-layer fab capabilities.
+
+### Routing to do
+
+Press **B** (fill zones) first. The planes connect every through-hole
+VCC and GND pin by themselves.
+
+With the planes filled, DRC lists 253 unconnected items. Almost all are
+signals. The rest need short links on the outer layers:
+
+- **Power path:** Q1 (surface mount) needs short tracks to F1 and to the
+  +5V rail at C1.
+- **USB-C:** J6's surface-mount GND pins need a via to the ground plane.
+
+Suggestions:
+
+- Route the address and data buses first, mostly horizontal on F.Cu and
+  vertical on B.Cu.
+- Keep PHI2 and CLK2 short and away from the board edge. Run them between
+  U3, JP2, U10 and the CPU, VIA and ACIA PHI2 pins, over the unbroken GND
+  plane.
+- Before ordering, open the 3D viewer (Alt+3) and check that the USB-C
+  receptacle (J6), the bench terminal (J1) and the DB9 (J2) face off the
+  board edge. Their orientation was set from the footprint drawings, not
+  checked in 3D.
+
+### DRC as committed
+
+- 0 schematic-parity issues (`kicad-cli pcb drc --schematic-parity`).
+- No courtyard, clearance or hole violations.
+- 2 silkscreen-clipped-by-edge warnings, from the DB9 shell outline. The
+  shell overhangs the edge by design.
+- Unconnected items only, because the board isn't routed.
+

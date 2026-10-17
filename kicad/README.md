@@ -17,7 +17,7 @@ No PCB layout exists yet. The planned board is 4 layers
 | Sheet | Contents |
 |-------|----------|
 | `be6502.kicad_sch` | Root: sheet index, memory map |
-| `cpu.kicad_sch` | U1 W65C816S and pull-ups R11–R14, U2 74HC573 bank latch, U3 ATF22V10C (816DEC03), X1 12 MHz oscillator, reset |
+| `cpu.kicad_sch` | U1 W65C816S and pull-ups R11–R14, U2 74HC573 bank latch, U3 ATF22V10C (816DEC03), X1 12 MHz oscillator, U11 DS1813-5 reset supervisor and SW1 |
 | `memory.kicad_sch` | U4 AT28C256 ROM, U5 AS6C4008 RAM |
 | `io.kicad_sch` | U6 74HC138, U7 W65C22N VIA with Port B LEDs, U8 W65C51N ACIA, X2 1.8432 MHz oscillator, U9 MAX232N, J2 DB9 |
 | `power.kicad_sch` | J6 USB-C and J1 bench input, JP4 source select, SW2 power switch, F1 polyfuse, Q1 reverse-polarity FET, C1 bulk, D9 power LED, C6–C17 decoupling |
@@ -29,7 +29,8 @@ Sheets connect through global labels.
 
 | Area | Breadboard | Rev 2 |
 |------|------------|-------|
-| RDY, `~{NMI}`, `~{ABORT}`, BE | Tied straight to +5V | 3.3k pull-ups R11–R14, and on J3. RDY is bidirectional: `WAI` drives it low |
+| RDY, `~{NMI}`, `~{ABORT}`, BE | Tied straight to +5V | Pull-ups (R11 1k on RDY, as on the breadboard; R12–R14 3.3k), and on J3. RDY is bidirectional: `WAI` drives it low |
+| Reset | 1k pull-up and push button | U11 DS1813-5: power-on reset and button debounce. R1 is now 10k |
 | VDA, VPA | Not connected | To GAL pins 11 and 13 (816DEC03 `/IOSEL` qualifier) and to J3 |
 | GAL | 816DEC02 | 816DEC03 (`pld/decode03.pld`) |
 | Bank latch Q3–Q6 | Not connected | A19–A22, to J3 only |
@@ -161,8 +162,7 @@ same pinout.
 
 The following is the same as on the breadboard.
 
-- **CPU:** VP, ML, E and MX are not connected. `~{RES}` has pull-up R1
-  (1k) and push button SW1. `~{IRQ}` has pull-up R2 (1k) and is shared, open
+- **CPU:** VP, ML, E and MX are not connected. `~{IRQ}` has pull-up R2 (1k) and is shared, open
   drain, by the VIA, the ACIA and J3.
 - **Memory:** the ROM and RAM share `~{OEGATE}`. `~{WEGATE}` goes only to
   the RAM. The ROM's `~{WE}` is tied high.
@@ -190,3 +190,13 @@ Checked with KiCad 9.0.4's `kicad-cli`:
 
 The files are written in the KiCad 7 file format (`version 20230121`), so
 KiCad 7 and newer should open them. Only KiCad 9.0.4 has been tested.
+
+## Reset
+
+U11 is a DS1813-5 in TO-92 (pin 1 RST, pin 2 VCC, pin 3 GND). It holds
+`~{RES}` low for about 150 ms after power comes up, and again whenever the
+supply dips below its trip point. RST is open drain with an internal 5.5k
+pull-up, so it shares `~{RES}` with SW1 and J3. Any low on the line, a button
+press for example, is stretched into a full, debounced reset. R1 (10k) only
+keeps `~{RES}` defined if U11 is left out. The -5 part trips nearer 5 V than
+the DS1813-10 (4.35 V). If a weak USB supply causes spurious resets, fit the -10.

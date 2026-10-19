@@ -1,10 +1,12 @@
 GAL22V10
-816DEC02
+816DEC03
 
 CLK2 RWB  A12  A13  A14    A15   A16   A17   A18    A23    NC   GND
-NC   LE   NC   NC   VRAMCE RAMCE ROMCE IOSEL OEGATE WEGATE PHI2 VCC
+NC   LE   WS   NC   VRAMCE RAMCE ROMCE IOSEL OEGATE WEGATE PHI2 VCC
 
-PHI2.R = /PHI2
+PHI2.R = /PHI2 + PHI2 * /WS * /A23 * /A18 * /A17 * /A16 * A15
+
+WS.R = PHI2 * /WS * /A23 * /A18 * /A17 * /A16 * A15
 
 LE = /PHI2 * /CLK2
 
@@ -29,9 +31,12 @@ DESCRIPTION
 W65C816S address decode, clock divider and bank latch enable.
 Target: ATF22V10C-7PX.
 
-Supersedes 816DEC01. Changes: PHI2 is now generated here as a divide-by-two
-of a 2x oscillator on pin 1, and LE for the bank latch is generated here as
-well. See NOTE 6.
+Supersedes 816DEC02. Changes: PHI2 high is stretched by one CLK2 period on
+every cycle that selects the ROM, so the AT28C256 gets a wait state. WS on
+pin 15 is the state bit for this. See NOTE 8.
+
+816DEC02 superseded 816DEC01. PHI2 became a divide-by-two of a 2x oscillator
+on pin 1, and LE for the bank latch moved into the GAL. See NOTE 6.
 
 
 PIN ASSIGNMENT
@@ -50,7 +55,7 @@ PIN ASSIGNMENT
 12  GND
 13  NC
 14  LE      74xx573 pin 11 LE
-15  NC      spare macrocell
+15  WS      not connected -- wait state register, see NOTE 8
 16  NC      spare macrocell
 17  VRAMCE  62256 pin 20  /CE
 18  RAMCE   AS6C4008 pin 22 /CE
@@ -174,9 +179,10 @@ byte does not arrive until 33 ns after PHI2 falls in any case. For cycles
 longer than 132 ns the late opening costs nothing at all. The binding read
 constraint is tACE: bank valid at RAM 44 ns, RAMCE 51.5 ns, plus 55 ns
 access and 10 ns CPU setup gives a minimum cycle of 116.5 ns, about 8.5 MHz.
+That is the RAM figure. ROM cycles are stretched and handled in NOTE 8.
 
 Single-stepping. Each manual clock pulse is now half a bus cycle. Two pulses
-advance the CPU by one cycle.
+advance the CPU by one cycle, or three for a cycle that selects the ROM.
 
 
 NOTE 7 -- ITEMS TO VERIFY BEFORE RELYING ON THIS FILE
@@ -197,3 +203,76 @@ c) Power-up phase. The 22V10's registers power up reset, so check on the
 d) Output level. PHI2 now drives the CPU clock input from a GAL output.
    The ATF22V10C guarantees VOH of only 2.4 V at 4 mA, while the W65C816S
    needs 3.5 V. Measure it.
+
+
+NOTE 8 -- ROM WAIT STATE
+
+The AT28C256-15 needs 150 ns from /CE and 70 ns from /OE. A plain 6 MHz
+cycle is too short for both:
+
+  cycle 166.7 ns, CPU wants data 10 ns before PHI2 falls, so by 156.7 ns
+  ROMCE settles at 37.5 ns (A15 30 ns + 7.5 ns), 119 ns left, needs 150
+  OEGATE asserts at 91 ns (PHI2 rise + 7.5 ns), 66 ns left, needs 70
+
+So on a cycle that selects the ROM, PHI2 is held high for one extra CLK2
+period. The cycle becomes 250 ns: 83.3 ns low, 166.7 ns high.
+
+WS is a one-bit counter. At every rising edge of CLK2:
+
+  PHI2  WS  ROM  ->  PHI2  WS
+   0    x    x        1    0     start of PHI2 high
+   1    0    1        1    1     ROM cycle, stay high one more CLK2 period
+   1    0    0        0    0     not ROM, PHI2 falls as before
+   1    1    x        0    0     wait state done, PHI2 falls
+
+ROM is the ROMCE decode term, written out from the address pins rather
+than fed back from pin 19.
+
+When the decision is taken. The stretch is decided at the edge where PHI2
+would otherwise fall, 166.7 ns into the cycle, not at the edge where PHI2
+rises. By then A15 has been valid for over 130 ns and the bank latch has
+been closed since PHI2 rose (NOTE 6), so A16-A18 and A23 are steady.
+Deciding at the rising edge would depend on the 74xx573 output having
+settled by 83 ns, which a 74HC573 does not promise.
+
+ROM timing with the stretch. Data is due at 240 ns.
+
+  /CE, bank unchanged    ROMCE at 37.5 ns    202 ns available, needs 150
+  /CE, bank changed      ROMCE at ~92 ns     148 ns available, needs 150
+  /OE                    OEGATE at 91 ns     149 ns available, needs 70
+
+The bank-changed line assumes a 74HC573 at its 35 ns LE-to-Q maximum
+(4.5 V, 25 C), on a cycle whose bank byte differs from the previous
+cycle's -- for example an opcode fetch from ROM straight after a long
+access to bank 1. It misses the datasheet by about 2 ns. A 74AC573 or
+74ACT573 in that socket, as NOTE 6 assumes, removes the shortfall. So
+would A15 alone as the stretch condition, but that would also stretch
+RAM accesses to $8000-$FFFF in banks 1-7.
+
+What else sees the stretch.
+
+  RAM and I/O cycles are unchanged.
+  Any cycle with a ROM address is stretched, including internal operation
+  cycles and writes to ROM addresses, because VDA and VPA are not
+  decoded. This costs time, never correctness.
+  LE stays low through the stretched high phase, so the bank latch stays
+  closed and A16-A23 hold.
+  WEGATE and OEGATE are PHI2 gated, so they simply stay asserted longer.
+  The W65C816S, W65C22 and W65C51N are static and have no maximum PHI2
+  high time.
+
+Software. PHI2 is no longer a fixed 6 MHz, because the VIA timers count
+PHI2 cycles and so do delay loops. Code running from ROM sees most of its
+cycles take 250 ns rather than 166.7 ns, so the delays in bios.s and
+xmodem.s, all calibrated from PHI2_HZ, run long by up to 1.5x. Every one
+of them is a minimum (TX pacing for the 65C51 transmit bug, XMODEM
+timeouts), so long is safe. Serial output is slower than 115200 would
+allow. The 65C51 baud rate comes from its own 1.8432 MHz oscillator and is
+not affected.
+
+Power-up. If WS comes up set, the table above clears it on the first CLK2
+edge whatever PHI2 is doing, so no reset term is needed. The CPU is held in
+reset for far longer than that in any case.
+
+Verify on the bench: with a scope on PHI2 and ROMCE, ROM cycles should
+show a high phase twice as long as RAM cycles.

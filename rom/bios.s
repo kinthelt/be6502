@@ -38,6 +38,8 @@ ACIA_CTLR   = $7003 ; ACIA control register
 BANK_FIRST  = $01
 BANK_LAST   = $07
 
+; PHI2 cycles that select the ROM are stretched to 250 ns (pld/decode.pld,
+; NOTE 8), so delays counted in PHI2 cycles run long when code is in ROM.
 PHI2_HZ     = 6000000
 ;PHI2_HZ     = 1000000
 BAUD        = 115200

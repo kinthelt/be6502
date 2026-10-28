@@ -20,6 +20,10 @@ With the addition of multiple banks, I won't be able to use a single 7400 to dec
 The KiCad schematic is in [`kicad/`](kicad/), and [`kicad/be6502.pdf`](kicad/be6502.pdf)
 is a plot of it. See [`kicad/README.md`](kicad/README.md).
 
+There is also an unfabricated two-layer PCB layout made from the schematic,
+[`kicad/be6502.kicad_pcb`](kicad/be6502.kicad_pcb). Renders are in
+[`kicad/renders/`](kicad/renders/).
+
 ## The Ben Eater Address Space
 
 | Range           | Size    | Device                          | Notes                                      |

@@ -1,7 +1,10 @@
-# KiCad schematic
+# KiCad schematic and PCB
 
-Schematic for the W65C816S breadboard computer, as built. Open
-`be6502.kicad_pro` in KiCad 7 or newer. `be6502.pdf` is a plot of all sheets.
+Schematic for the W65C816S breadboard computer, as built, and a two-layer PCB
+laid out from it. Open `be6502.kicad_pro` in KiCad 7 or newer. `be6502.pdf` is
+a plot of all sheets.
+
+![Populated board](renders/populated.png)
 
 ## Sheets
 
@@ -91,6 +94,31 @@ KiCad libraries, with pins such as `OE`, `Load` and `CE#` renamed to `~{OE}`,
 
 **Resistor values**
 - R1–R10 are 1k, measured with a multimeter.
+
+## PCB
+
+`be6502.kicad_pcb` is a 175 × 125 mm two-layer, all through-hole board made
+from the schematic. It shows what the computer would look like on a PCB. It
+has not been fabricated.
+
+- Bare-board renders: `renders/front.png` and `renders/back.png`.
+- 0.2 mm signal tracks and 0.5 mm `VCC`/`GND` tracks (net class `Power`),
+  0.2 mm clearance, 0.8/0.4 mm vias. Both layers have a `GND` pour.
+- Footprints the schematic did not specify: R 0207 axial with 7.62 mm pitch,
+  C 5 mm radial electrolytic, 3 mm LEDs, 6 mm tactile switch for SW1, a 2-pin
+  5.08 mm screw terminal for J1 (bench supply), and a right-angle female DE-9
+  for J2.
+- H1–H4 are M3 mounting holes. They exist only on the board.
+- The tracks came from a simple
+  grid router in `pcb-tools/` (`build.py` places, `route.py` routes,
+  `finish.py` pours and writes the DRC report, `compose.py` and `render.js`
+  make the images).
+- DRC with KiCad 7.0.11 reports 0 violations and 0 unconnected pads.
+
+The board follows the schematic exactly, so C1 is the only decoupling
+capacitor. A real board should have a 0.1 µF capacitor next to each chip's
+power pins. Add them to the schematic first, then use *Update PCB from
+Schematic*.
 
 ## Verification
 
